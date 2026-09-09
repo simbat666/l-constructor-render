@@ -9,7 +9,7 @@ from pathlib import Path
 from openpyxl import load_workbook
 
 
-SOURCE = Path("/Users/dmitrijmitin/Downloads/ОЛ - Электродвигатель асинхронный_В2.xlsx")
+SOURCE = Path("/Users/dmitrijmitin/Downloads/ОЛ - Электродвигатель асинхронный_В2 [VP8NEk].xlsx")
 TARGET = Path(__file__).resolve().parents[1] / "data" / "motor-v2.json"
 
 
@@ -50,13 +50,13 @@ def main():
 
     index2 = []
     for excel_row, row in enumerate(rows(book["Load index 2"])[1:], start=2):
-        if row[7] is None:
+        if row[8] is None:
             continue
         index2.append({
             "sourceRow": excel_row, "selectionCode": value(row[0]), "selection": value(row[1]),
-            "voltageCode": value(row[1]), "voltage": value(row[2]), "startCode": value(row[3]),
-            "start": value(row[4]), "currentFrom": num(row[5]), "currentTo": num(row[6]),
-            "loadIndex": value(row[7]), "linesAmount": value(row[8]),
+            "voltageCode": value(row[2]), "voltage": value(row[3]), "startCode": value(row[4]),
+            "start": value(row[5]), "currentFrom": num(row[6]), "currentTo": num(row[7]),
+            "loadIndex": value(row[8]), "linesAmount": value(row[9]),
         })
 
     diagrams1 = []
@@ -86,31 +86,37 @@ def main():
             "placement": value(row[22]),
         })
 
-    sp1 = []
+    manualVfd = []
     for excel_row, row in enumerate(rows(book["sp1"])[1:], start=2):
-        if row[2] is None:
+        if row[4] is None:
             continue
-        sp1.append({"sourceRow": excel_row, "selectionCode": value(row[0]), "selection": value(row[1]), "model": value(row[2]), "loadIndex": value(row[3]), "name": value(row[4]), "quantity": value(row[5]), "unit": value(row[6]), "lde": value(row[7])})
+        manualVfd.append({"sourceRow": excel_row, "location": value(row[1]), "selectionCode": value(row[2]), "selection": value(row[3]), "model": value(row[4]), "loadIndex": value(row[5]), "name": value(row[6]), "quantity": value(row[7]), "unit": value(row[8]), "lde": value(row[9])})
 
-    sp2 = []
+    automaticVfd = []
     for excel_row, row in enumerate(rows(book["sp2"])[1:], start=2):
-        if row[0] is None:
+        if row[4] is None:
             continue
-        sp2.append({"sourceRow": excel_row, "diagram1": value(row[0]), "name": value(row[1]), "quantity": value(row[2]), "unit": value(row[3]), "lde": value(row[4])})
+        automaticVfd.append({"sourceRow": excel_row, "location": value(row[1]), "selectionCode": value(row[2]), "selection": value(row[3]), "brand": value(row[4]), "loadIndex": value(row[5]), "name": value(row[6]), "quantity": value(row[7]), "unit": value(row[8]), "lde": value(row[9])})
 
-    sp3 = []
+    sensorSpecification = []
     for excel_row, row in enumerate(rows(book["sp3"])[1:], start=2):
         if row[0] is None:
             continue
-        sp3.append({"sourceRow": excel_row, "diagram1": value(row[0]), "loadIndex": value(row[1]), "name": value(row[2]), "quantity": value(row[3]), "unit": value(row[4]), "lde": value(row[5])})
+        sensorSpecification.append({"sourceRow": excel_row, "diagram1": value(row[0]), "name": value(row[1]), "quantity": value(row[2]), "unit": value(row[3]), "lde": value(row[4])})
+
+    mainSpecification = []
+    for excel_row, row in enumerate(rows(book["sp4"])[1:], start=2):
+        if row[0] is None:
+            continue
+        mainSpecification.append({"sourceRow": excel_row, "diagram1": value(row[0]), "loadIndex": value(row[1]), "name": value(row[2]), "quantity": value(row[3]), "unit": value(row[4]), "lde": value(row[5])})
 
     TARGET.parent.mkdir(parents=True, exist_ok=True)
     TARGET.write_text(json.dumps({
-        "source": {"file": SOURCE.name, "revision": "В2", "sheets": ["Load index 1", "Load index 2", "diagram 1", "diagram 2", "sp1", "sp2", "sp3"]},
+        "source": {"file": SOURCE.name, "revision": "В2 VP8NEk", "sheets": ["Load index 1", "Load index 2", "diagram 1", "diagram 2", "sp1", "sp2", "sp3", "sp4"]},
         "loadIndex1": index1, "loadIndex2": index2, "diagrams1": diagrams1, "diagrams2": diagrams2,
-        "sp1": sp1, "sp2": sp2, "sp3": sp3,
+        "manualVfd": manualVfd, "automaticVfd": automaticVfd, "sensorSpecification": sensorSpecification, "mainSpecification": mainSpecification,
     }, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
-    print(f"Wrote {TARGET} | {len(index1)} + {len(index2)} load-index rows | {len(diagrams1)} + {len(diagrams2)} diagram rows")
+    print(f"Wrote {TARGET} | {len(index1)} + {len(index2)} load-index rows | {len(diagrams1)} + {len(diagrams2)} diagram rows | VFD {len(manualVfd)} manual/{len(automaticVfd)} auto")
 
 
 if __name__ == "__main__":
