@@ -3,110 +3,70 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { calculateMotor, type MotorInput, type SensorWire, type StartMethod, type ThermalContact } from "@/lib/motor-engine";
 
-const initialOptions = ["ПЧ", "Заслонка", "Фильтр", "Датчики", "ПДУ"];
+const startOptions: Array<{ value: StartMethod; label: string }> = [
+  { value: "direct", label: "Прямой пуск" }, { value: "vfd", label: "Пуск через ЧП" },
+  { value: "soft", label: "Устройство плавного пуска" }, { value: "star", label: "Звезда–треугольник" }, { value: "triac", label: "Триак" },
+];
+const ioLabels: Record<string, string> = { di0: "DI 0 В", di24: "DI 24 В", doTransistor: "DO транз.", doRelay: "DO реле", aiPt1000: "AI Pt1000", ai420: "AI 4–20", ai010: "AI 0–10", ao420: "AO 4–20", ao010: "AO 0–10" };
+const initial: MotorInput = { name: "Электродвигатель П1", start: "direct", voltage: 400, current: 12.2, trip: "thermal", vfdLocation: "inside", controlInput: "di0", actuatorOutput: "relay", thermalContact: "none", ptc: false, windingPt100: "none", bearingPt100: "none" };
 
 export default function Home() {
-  const [cabinetName, setCabinetName] = useState("Приточная установка П1");
-  const [motorCurrent, setMotorCurrent] = useState("12.2");
-  const [supply, setSupply] = useState("3Ф · 400 В");
-  const [options, setOptions] = useState(initialOptions);
-  const [generatedAt, setGeneratedAt] = useState<string | null>(null);
-
-  const current = Number(motorCurrent.replace(",", ".")) || 0;
-  const protection = current <= 4 ? "QF 10 A" : current <= 10 ? "QF 16 A" : "QF 25 A";
-  const moduleCount = 4 + options.length;
-  const marking = useMemo(
-    () => `L-${supply.startsWith("3") ? "3" : "1"}Ф-${current.toFixed(1).replace(".", ",")}A-${options.length.toString().padStart(2, "0")}`,
-    [supply, current, options.length],
-  );
-
-  function toggleOption(option: string) {
-    setOptions((items) => items.includes(option) ? items.filter((item) => item !== option) : [...items, option]);
-  }
-
-  function generate() {
-    setGeneratedAt(new Intl.DateTimeFormat("ru-RU", { hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(new Date()));
-  }
+  const [input, setInput] = useState<MotorInput>(initial);
+  const [requested, setRequested] = useState(false);
+  const result = useMemo(() => calculateMotor(input), [input]);
+  const update = <K extends keyof MotorInput>(key: K, value: MotorInput[K]) => setInput((current) => ({ ...current, [key]: value }));
+  const isVfd = input.start === "vfd";
 
   useEffect(() => {
     const context = document.modelContext;
     if (!context?.registerTool) return;
     const lifecycle = new AbortController();
     void Promise.resolve(context.registerTool({
-      name: "generate_test_cabinet",
-      title: "Сформировать тестовый шкаф",
-      description: "Заполняет тестовую конфигурацию шкафа и формирует видимый результат в лаборатории L.",
-      inputSchema: {
-        type: "object",
-        properties: {
-          cabinetName: { type: "string", description: "Наименование шкафа" },
-          motorCurrentA: { type: "number", minimum: 0.1, maximum: 999, description: "Номинальный ток двигателя, А" },
-          supply: { type: "string", enum: ["3Ф · 400 В", "1Ф · 230 В"] },
-        },
-        required: ["cabinetName", "motorCurrentA", "supply"],
-        additionalProperties: false,
-      },
+      name: "calculate_motor_cabinet", title: "Рассчитать шкаф двигателя", description: "Заполняет исходные данные электродвигателя и запускает подбор по ОЛ «Электродвигатель асинхронный В2».",
+      inputSchema: { type: "object", properties: { name: { type: "string" }, currentA: { type: "number", minimum: 0.1 }, start: { type: "string", enum: ["direct", "vfd", "soft", "star", "triac"] }, voltage: { type: "number", enum: [230, 400] } }, required: ["name", "currentA", "start", "voltage"], additionalProperties: false },
       annotations: { readOnlyHint: false, untrustedContentHint: false },
-      execute(input) {
-        const data = input as { cabinetName?: unknown; motorCurrentA?: unknown; supply?: unknown };
-        if (typeof data.cabinetName !== "string" || !data.cabinetName.trim() || typeof data.motorCurrentA !== "number" || data.motorCurrentA <= 0 || (data.supply !== "3Ф · 400 В" && data.supply !== "1Ф · 230 В")) {
-          throw new Error("Нужны наименование, ток больше нуля и допустимое питание.");
-        }
-        setCabinetName(data.cabinetName.trim());
-        setMotorCurrent(String(data.motorCurrentA));
-        setSupply(data.supply);
-        generate();
-        return { status: "generated", cabinetName: data.cabinetName.trim(), motorCurrentA: data.motorCurrentA, supply: data.supply };
+      execute(payload) {
+        const data = payload as { name?: unknown; currentA?: unknown; start?: unknown; voltage?: unknown };
+        if (typeof data.name !== "string" || !data.name.trim() || typeof data.currentA !== "number" || data.currentA <= 0 || !startOptions.some((item) => item.value === data.start) || (data.voltage !== 230 && data.voltage !== 400)) throw new Error("Нужны наименование, положительный ток, тип пуска и 230 или 400 В.");
+        setInput((current) => ({ ...current, name: data.name!.trim(), current: data.currentA as number, start: data.start as StartMethod, voltage: data.voltage as 230 | 400, trip: data.start === "vfd" ? "magnetic" : current.trip }));
+        setRequested(true);
+        return { status: "calculated", source: "ОЛ — Электродвигатель асинхронный В2" };
       },
     }, { signal: lifecycle.signal })).catch(() => undefined);
     return () => lifecycle.abort();
   }, []);
 
-  return (
-    <main className="min-h-screen bg-[#080b0d] text-slate-100">
-      <header className="border-b border-white/10 bg-[#0c1013]">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 sm:px-8">
-          <div className="flex items-center gap-3"><span className="grid size-9 place-items-center rounded-lg bg-[#b7ff3c] font-mono text-lg font-black text-black">L</span><div><h1 className="font-mono text-base font-bold tracking-[0.18em]">L / LAB</h1><p className="text-xs text-slate-500">Инженерный тестовый стенд</p></div></div>
-          <span className="rounded-full border border-[#b7ff3c]/30 bg-[#b7ff3c]/10 px-3 py-1 text-xs font-medium text-[#c8ff63]">online · test</span>
+  return <main className="min-h-screen bg-[#080b0d] text-slate-100">
+    <header className="border-b border-white/10 bg-[#0c1013]"><div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 sm:px-8"><div className="flex items-center gap-3"><span className="grid size-9 place-items-center rounded-lg bg-[#b7ff3c] font-mono text-lg font-black text-black">L</span><div><h1 className="font-mono text-base font-bold tracking-[0.18em]">L / ENGINEERING LAB</h1><p className="text-xs text-slate-500">Свободный конструктор шкафов автоматики</p></div></div><span className="rounded-full border border-[#b7ff3c]/30 bg-[#b7ff3c]/10 px-3 py-1 text-xs font-medium text-[#c8ff63]">online · В2 / motor</span></div></header>
+    <div className="mx-auto grid max-w-7xl gap-5 px-5 py-6 sm:px-8 lg:grid-cols-[minmax(370px,0.82fr)_minmax(480px,1.18fr)]">
+      <section className="rounded-xl border border-white/10 bg-[#10161a] p-5 sm:p-7">
+        <p className="font-mono text-xs uppercase tracking-[0.18em] text-[#b7ff3c]">01 / ОЛ В2 · исходные данные</p><h2 className="mt-1 text-2xl font-semibold tracking-tight">Электродвигатель асинхронный</h2><p className="mt-2 text-sm leading-6 text-slate-400">Первый рабочий блок L: подбирает индекс нагрузки, электрические схемы, I/O и состав из строк ОЛ.</p>
+        <div className="mt-6 space-y-4">
+          <Field label="Наименование"><Input value={input.name} onChange={(event) => update("name", event.target.value)} className="mt-1.5 h-10 border-white/10 bg-black/20" /></Field>
+          <div className="grid gap-4 sm:grid-cols-2"><Field label="Тип пуска"><Select value={input.start} onChange={(event) => { const start = event.target.value as StartMethod; setInput((current) => ({ ...current, start, trip: start === "vfd" ? "magnetic" : current.trip })); }}>{startOptions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</Select></Field><Field label={isVfd ? "Ток ЧП для подбора, А" : "Номинальный ток, А"}><Input inputMode="decimal" value={String(input.current).replace(".", ",")} onChange={(event) => update("current", Number(event.target.value.replace(",", ".")))} className="mt-1.5 h-10 border-white/10 bg-black/20" /></Field></div>
+          <div className="grid gap-4 sm:grid-cols-2"><Field label="Питание"><Select value={String(input.voltage)} onChange={(event) => update("voltage", Number(event.target.value) as 230 | 400)}><option value="400">400 В · 3L/PE</option><option value="230">230 В · 1L/N/PE</option></Select></Field><Field label="Защита"><Select value={input.trip} onChange={(event) => update("trip", event.target.value as MotorInput["trip"])} disabled={isVfd}><option value="thermal">Тепловая</option><option value="magnetic">Магнитная</option></Select></Field></div>
+          {isVfd && <Field label="Расположение ЧП"><Select value={input.vfdLocation} onChange={(event) => update("vfdLocation", event.target.value as MotorInput["vfdLocation"])}><option value="inside">Внутри шкафа</option><option value="outside">Снаружи шкафа</option></Select></Field>}
+          <details className="rounded-lg border border-white/10 bg-black/15 p-4"><summary className="cursor-pointer text-sm font-medium text-slate-200">Сигналы и датчики</summary><div className="mt-4 space-y-4"><div className="grid gap-4 sm:grid-cols-2"><Field label="Вход управления"><Select value={input.controlInput} onChange={(event) => update("controlInput", event.target.value as MotorInput["controlInput"])}><option value="di0">DI 0 В</option><option value="di24">DI 24 В</option></Select></Field><Field label="Выход управления"><Select value={input.actuatorOutput} onChange={(event) => update("actuatorOutput", event.target.value as MotorInput["actuatorOutput"])}><option value="relay">Релейный</option><option value="transistor">Транзисторный</option></Select></Field></div><div className="grid gap-4 sm:grid-cols-2"><Field label="Термоконтакт"><Select value={input.thermalContact} onChange={(event) => update("thermalContact", event.target.value as ThermalContact)}><option value="none">Не подключён</option><option value="di0">DI 0 В</option><option value="di24">DI 24 В</option></Select></Field><Field label="PTC"><Select value={input.ptc ? "yes" : "no"} onChange={(event) => update("ptc", event.target.value === "yes")}><option value="no">Нет</option><option value="yes">Есть</option></Select></Field></div><div className="grid gap-4 sm:grid-cols-2"><Field label="Pt100 обмотки"><SensorSelect value={input.windingPt100} onChange={(value) => update("windingPt100", value)} /></Field><Field label="Pt100 подшипников"><SensorSelect value={input.bearingPt100} onChange={(value) => update("bearingPt100", value)} /></Field></div></div></details>
+          <Button onClick={() => setRequested(true)} size="lg" className="h-11 w-full bg-[#b7ff3c] font-semibold text-black hover:bg-[#c8ff63]">Рассчитать по ОЛ →</Button>
         </div>
-      </header>
-
-      <div className="mx-auto grid max-w-7xl gap-5 px-5 py-6 sm:px-8 lg:grid-cols-[minmax(0,0.9fr)_minmax(440px,1.1fr)]">
-        <section className="rounded-xl border border-white/10 bg-[#10161a] p-5 sm:p-7">
-          <p className="mb-1 font-mono text-xs uppercase tracking-[0.18em] text-[#b7ff3c]">01 / исходные данные</p>
-          <h2 className="text-2xl font-semibold tracking-tight">Собери тестовый шкаф</h2>
-          <p className="mt-2 text-sm leading-6 text-slate-400">Это стартовый экран L. Дальше сюда подключим реальную базу, правила и выпуск КД.</p>
-          <div className="mt-7 space-y-5">
-            <label className="block text-sm font-medium text-slate-300">Наименование шкафа<Input value={cabinetName} onChange={(event) => setCabinetName(event.target.value)} className="mt-2 h-11 border-white/10 bg-black/20 text-base" /></label>
-            <div className="grid gap-5 sm:grid-cols-2">
-              <label className="block text-sm font-medium text-slate-300">Питание<select value={supply} onChange={(event) => setSupply(event.target.value)} className="mt-2 h-11 w-full rounded-lg border border-white/10 bg-black/20 px-3 text-base text-slate-100 outline-none focus:border-[#b7ff3c]"><option>3Ф · 400 В</option><option>1Ф · 230 В</option></select></label>
-              <label className="block text-sm font-medium text-slate-300">Номинальный ток, А<Input inputMode="decimal" value={motorCurrent} onChange={(event) => setMotorCurrent(event.target.value)} className="mt-2 h-11 border-white/10 bg-black/20 text-base" /></label>
-            </div>
-            <fieldset><legend className="text-sm font-medium text-slate-300">Функциональные блоки</legend><div className="mt-3 flex flex-wrap gap-2">{initialOptions.map((option) => <button key={option} type="button" onClick={() => toggleOption(option)} className={`rounded-full border px-3 py-2 text-sm transition ${options.includes(option) ? "border-[#b7ff3c]/50 bg-[#b7ff3c]/15 text-[#d3ff80]" : "border-white/10 bg-white/[0.03] text-slate-400 hover:border-white/30"}`}>{options.includes(option) ? "✓ " : "+ "}{option}</button>)}</div></fieldset>
-            <Button onClick={generate} size="lg" className="h-11 w-full bg-[#b7ff3c] font-semibold text-black hover:bg-[#c8ff63]">Сформировать тестовый результат →</Button>
-          </div>
-        </section>
-
-        <section className="relative overflow-hidden rounded-xl border border-white/10 bg-[#0d1215] p-5 sm:p-7">
-          <div className="absolute inset-0 opacity-30 [background-image:linear-gradient(#ffffff08_1px,transparent_1px),linear-gradient(90deg,#ffffff08_1px,transparent_1px)] [background-size:28px_28px]" />
-          <div className="relative">
-            <div className="flex items-start justify-between gap-4"><div><p className="font-mono text-xs uppercase tracking-[0.18em] text-slate-500">02 / результат</p><h2 className="mt-1 text-2xl font-semibold tracking-tight">{cabinetName || "Новый шкаф"}</h2></div><span className="rounded-md border border-white/10 bg-black/20 px-2 py-1 font-mono text-xs text-slate-300">{marking}</span></div>
-            <div className="mt-7 grid gap-3 sm:grid-cols-3"><Metric label="Модулей" value={String(moduleCount)} /><Metric label="Защита" value={protection} /><Metric label="Статус" value={generatedAt ? "готово" : "черновик"} accent={!!generatedAt} /></div>
-            <div className="mt-7 rounded-lg border border-white/10 bg-black/20 p-4"><div className="flex items-center justify-between"><h3 className="font-mono text-xs uppercase tracking-[0.14em] text-slate-400">Цепочка выпуска</h3><span className="text-xs text-slate-500">{generatedAt ? `расчёт ${generatedAt}` : "ожидание расчёта"}</span></div><div className="mt-5 grid grid-cols-4 gap-2 text-center text-xs"><Step label="Модель" active /><Step label="BOM" active={!!generatedAt} /><Step label="Э5" active={!!generatedAt} /><Step label="КД" active={!!generatedAt} /></div></div>
-            <div className="mt-7"><h3 className="font-mono text-xs uppercase tracking-[0.14em] text-slate-400">Будущий комплект</h3><ul className="mt-3 divide-y divide-white/10 rounded-lg border border-white/10 bg-black/15">{["Спецификация", "Перечень I/O", "Э3 и Э5", "Клеммник и кабельный журнал", "DXF/DWG-комплект"].map((item, index) => <li className="flex items-center justify-between px-4 py-3 text-sm" key={item}><span>{item}</span><span className={generatedAt ? "text-[#b7ff3c]" : "text-slate-600"}>{generatedAt ? "подготовлено" : index === 0 ? "макет" : "далее"}</span></li>)}</ul></div>
-          </div>
-        </section>
-      </div>
-      <footer className="mx-auto max-w-7xl px-5 pb-7 text-xs text-slate-600 sm:px-8">L — закрытый веб-стенд для быстрых проверок. Данные в этой версии не сохраняются.</footer>
-    </main>
-  );
+      </section>
+      <Result result={result} requested={requested} />
+    </div>
+    <footer className="mx-auto max-w-7xl px-5 pb-7 text-xs leading-5 text-slate-600 sm:px-8">Источник этого блока: «ОЛ — Электродвигатель асинхронный_В2.xlsx». Границы диапазонов и дубли правил L не выбирает молча — показывает как неоднозначность.</footer>
+  </main>;
 }
 
-function Metric({ label, value, accent = false }: { label: string; value: string; accent?: boolean }) {
-  return <div className="rounded-lg border border-white/10 bg-black/20 p-3"><p className="text-xs text-slate-500">{label}</p><p className={`mt-1 font-mono text-sm font-semibold ${accent ? "text-[#b7ff3c]" : "text-slate-100"}`}>{value}</p></div>;
+function Result({ result, requested }: { result: ReturnType<typeof calculateMotor>; requested: boolean }) {
+  if (!result.ok) return <section className="rounded-xl border border-white/10 bg-[#0d1215] p-5 sm:p-7"><p className="font-mono text-xs uppercase tracking-[0.18em] text-slate-500">02 / результат</p><h2 className="mt-1 text-2xl font-semibold">{requested ? "Нужно уточнение правила" : "Готов к расчёту"}</h2><div className="mt-6 rounded-lg border border-amber-300/20 bg-amber-300/5 p-4 text-sm leading-6 text-amber-100">{requested ? <ul className="space-y-2">{result.problems.map((item) => <li key={item}>• {item}</li>)}</ul> : "Заполни исходные данные и нажми «Рассчитать по ОЛ»."}</div><p className="mt-5 text-sm leading-6 text-slate-400">L не подменяет отсутствующее или конфликтующее правило предположением. После уточнения строки базы расчёт продолжится по той же цепочке.</p></section>;
+  const io = Object.entries(result.io).filter(([, value]) => value > 0);
+  return <section className="relative overflow-hidden rounded-xl border border-white/10 bg-[#0d1215] p-5 sm:p-7"><div className="absolute inset-0 opacity-30 [background-image:linear-gradient(#ffffff08_1px,transparent_1px),linear-gradient(90deg,#ffffff08_1px_1px,transparent_1px)] [background-size:28px_28px]" /><div className="relative"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-mono text-xs uppercase tracking-[0.18em] text-[#b7ff3c]">02 / рассчитанный состав</p><h2 className="mt-1 text-2xl font-semibold tracking-tight">{result.input.name}</h2><p className="mt-1 text-sm text-slate-400">Индекс нагрузки <span className="font-mono text-slate-200">{result.loadIndex.loadIndex}</span> · {result.main.controller}</p></div><span className="rounded-md border border-[#b7ff3c]/30 bg-[#b7ff3c]/10 px-2 py-1 font-mono text-xs text-[#d3ff80]">проверено по строкам</span></div><div className="mt-6 grid gap-3 sm:grid-cols-3"><Metric label="Главная схема" value={result.main.diagram1} /><Metric label="Схем всего" value={String(result.diagrams.length)} /><Metric label="Позиций" value={String(result.specification.length)} /></div>{result.vfd && <div className="mt-4 rounded-lg border border-[#b7ff3c]/20 bg-[#b7ff3c]/5 px-4 py-3 text-sm">ЧП по базе: <span className="font-mono text-[#d3ff80]">{result.vfd.model}</span></div>}<div className="mt-6 grid gap-5 xl:grid-cols-2"><Panel title="Электрические схемы"><div className="flex flex-wrap gap-2">{result.diagrams.map((code) => <Tag key={code}>{code}</Tag>)}</div><div className="mt-4 flex flex-wrap gap-2">{io.map(([key, value]) => <Tag key={key}>{ioLabels[key]}: {value}</Tag>)}</div></Panel><Panel title="Трассировка"><p>Нагрузка: <span className="font-mono text-slate-200">{result.trace.load}</span></p><p className="mt-2">Схемы: <span className="font-mono text-slate-200">{result.trace.diagrams.join(" · ")}</span></p><p className="mt-2">Строк спецификации: <span className="font-mono text-slate-200">{result.trace.specificationRows}</span></p></Panel></div><div className="mt-5"><h3 className="font-mono text-xs uppercase tracking-[0.14em] text-slate-400">Спецификация</h3><div className="mt-3 overflow-hidden rounded-lg border border-white/10"><table className="w-full text-left text-xs"><thead className="bg-white/[0.04] text-slate-500"><tr><th className="px-3 py-2 font-medium">Обозначение</th><th className="px-3 py-2 font-medium">Наименование</th><th className="px-3 py-2 text-right font-medium">Кол.</th></tr></thead><tbody className="divide-y divide-white/10">{result.specification.slice(0, 14).map((item) => <tr key={`${item.lde}-${item.name}`}><td className="px-3 py-2 font-mono text-[#c8ff63]">{item.lde}</td><td className="px-3 py-2 text-slate-300">{item.name}</td><td className="px-3 py-2 text-right text-slate-200">{item.quantity} {item.unit}</td></tr>)}</tbody></table></div>{result.specification.length > 14 && <p className="mt-2 text-xs text-slate-500">Показаны первые 14 из {result.specification.length} агрегированных позиций.</p>}</div><div className="mt-5 rounded-lg border border-dashed border-white/15 p-4 text-sm text-slate-400"><span className="font-medium text-slate-200">Следующий шаг:</span> превратить подтверждённый состав в Э3 / Э5, клеммник и DXF/DWG. Здесь расчёт оставляет след до каждой исходной строки.</div></div></section>;
 }
 
-function Step({ label, active = false }: { label: string; active?: boolean }) {
-  return <div><span className={`mx-auto grid size-8 place-items-center rounded-full border text-xs ${active ? "border-[#b7ff3c] bg-[#b7ff3c] text-black" : "border-white/15 bg-white/5 text-slate-500"}`}>{active ? "✓" : "·"}</span><p className="mt-2 text-slate-400">{label}</p></div>;
-}
+function Field({ label, children }: { label: string; children: React.ReactNode }) { return <label className="block text-sm font-medium text-slate-300"><span>{label}</span>{children}</label>; }
+function Select({ children, ...props }: React.SelectHTMLAttributes<HTMLSelectElement>) { return <select {...props} className="mt-1.5 h-10 w-full rounded-lg border border-white/10 bg-black/20 px-3 text-sm text-slate-100 outline-none focus:border-[#b7ff3c] disabled:cursor-not-allowed disabled:opacity-50">{children}</select>; }
+function SensorSelect({ value, onChange }: { value: SensorWire; onChange: (value: SensorWire) => void }) { return <Select value={value} onChange={(event) => onChange(event.target.value as SensorWire)}><option value="none">Нет</option><option value="2">2-проводный</option><option value="3">3-проводный</option><option value="4">4-проводный</option></Select>; }
+function Metric({ label, value }: { label: string; value: string }) { return <div className="rounded-lg border border-white/10 bg-black/20 p-3"><p className="text-xs text-slate-500">{label}</p><p className="mt-1 font-mono text-sm font-semibold text-slate-100">{value}</p></div>; }
+function Panel({ title, children }: { title: string; children: React.ReactNode }) { return <div className="rounded-lg border border-white/10 bg-black/20 p-4 text-xs text-slate-400"><h3 className="mb-3 font-mono text-xs uppercase tracking-[0.14em] text-slate-500">{title}</h3>{children}</div>; }
+function Tag({ children }: { children: React.ReactNode }) { return <span className="rounded border border-white/10 bg-white/[0.04] px-2 py-1 font-mono text-xs text-slate-300">{children}</span>; }
