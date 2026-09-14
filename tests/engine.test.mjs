@@ -37,6 +37,32 @@ test('direct motor has a single logical selection, load index and traced specifi
   assert.ok(result.blocks[0].specification.every(item => item.source));
 });
 
+test('supplied OL resolves diagram dimensions through semantic bindings, not Engine key cells', () => {
+  const start = q.visibleQuestionGroups(q.initialQuestionnaireState)
+    .find(item => item.question === 'Способ пуска / управления двигателем');
+  assert.equal(start.nodes[0].engineKey, null);
+  assert.equal(q.semanticKey(start.nodes[0]), 'diagram1.start');
+  assert.equal(calculateCabinet([{ id: 'one', tag: 'M1', state: complete() }]).canExport, true);
+});
+
+test('a direct VFD branch input wins over the generic voltage descendant', () => {
+  const state = structuredClone(q.initialQuestionnaireState);
+  const select = (question, answer) => {
+    const group = q.visibleQuestionGroups(state).find(item => item.question === question);
+    const node = group.nodes.find(item => item.answer === answer);
+    state.selected[group.key] = node.order;
+  };
+  select('Способ пуска / управления двигателем', 'Пуск через ЧП');
+  select('Расположение (ЧП / Симисторный регулятор скорости)', 'Внутри шкафа');
+  select('Способ подбора ЧП', 'Автоматический');
+  select('Производитель (бренд) / Серия (Тип)', 'VEDA 1');
+  select('Номинальное напряжение, В', '400 (3L/PE)');
+  const currents = q.visibleQuestionGroups(state)
+    .filter(item => item.question === 'Номинальный ток , А');
+  assert.deepEqual(currents.map(item => item.nodes[0].order), ['6.3']);
+  assert.equal(currents[0].nodes[0].inputRule, 'float|0.1..162.0|0.1');
+});
+
 test('two identical motors retain every occurrence and unique logical addresses', () => {
   const state = complete(true);
   const result = calculateCabinet([{ id: 'one', tag: 'M1', state }, { id: 'two', tag: 'M2', state: structuredClone(state) }]);
@@ -61,6 +87,16 @@ test('hidden sensor answers neither affect diagram selection nor survive pruning
   assert.equal(Object.keys(cleaned.selected).some(key => key.startsWith('Ques 2:')), false);
 });
 
+test('an unanswered optional bearing sensor does not block a cabinet', () => {
+  const state = complete(true);
+  delete state.checks['Ques 2:35.1'];
+  assert.equal(
+    q.missingRequiredAnswers(state).includes('Датчик температуры подшипников Pt100'),
+    false,
+  );
+  assert.equal(calculateCabinet([{ id: 'one', tag: 'M1', state }]).canExport, true);
+});
+
 test('incomplete cabinet cannot silently export only its completed motor', () => {
   const result = calculateCabinet([{ id: 'one', tag: 'M1', state: complete() }, { id: 'two', tag: 'M2', state: q.initialQuestionnaireState }]);
   assert.equal(result.canExport, false);
@@ -69,7 +105,7 @@ test('incomplete cabinet cannot silently export only its completed motor', () =>
 
 test('changed visible options invalidate an old choice; invalid optional strings are checked', () => {
   const state = complete();
-  const start = q.visibleQuestionGroups(state).find(item => item.nodes[0].engineKey === 'diagram1.start');
+  const start = q.visibleQuestionGroups(state).find(item => item.question === 'Способ пуска / управления двигателем');
   state.selected[start.key] = 'not-in-workbook';
   assert.ok(q.missingRequiredAnswers(state).includes(start.question));
   const valid = complete();

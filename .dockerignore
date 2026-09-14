@@ -8,3 +8,4 @@ output/generated
 .env.*
 .netlify
 .openai
+data/rules-source/

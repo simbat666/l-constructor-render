@@ -1,13 +1,21 @@
 {
-  "description": "Fallback semantic bindings for the current workbook; Engine key takes precedence. Never bind business meaning to sourceRow or order.",
+  "description": "Semantic bindings for the current workbook. Engine key, when supplied, takes precedence. Never bind business meaning to sourceRow or order.",
   "fields": [
+    {"sheet": "Ques 1", "question": "Способ пуска / управления двигателем", "key": "diagram1.start"},
+    {"sheet": "Ques 1", "question": "Расположение (ЧП / Симисторный регулятор скорости)", "key": "diagram1.location"},
+    {"sheet": "Ques 1", "question": "Номинальное напряжение, В", "key": "diagram1.voltage"},
+    {"sheet": "Ques 1", "question": "Тип защиты автоматического выключателя", "key": "diagram1.trip"},
     {"sheet": "Ques 1", "question": "Номинальный ток , А", "key": "motor.ratedCurrent"},
     {"sheet": "Ques 1", "question": "Электрическая номинальная мощность, кВт", "key": "motor.ratedPower"},
-    {"sheet": "Ques 1", "question": "Способ выбора", "key": "vfd.selection"},
+    {"sheet": "Ques 1", "question": "Способ подбора ЧП", "key": "vfd.selection"},
     {"sheet": "Ques 1", "question": "Входной ток ЧП", "key": "vfd.inputCurrent"},
     {"sheet": "Ques 3", "question": "Модель / Код заказа", "key": "vfd.model"},
     {"sheet": "Ques 2", "question": "Количество__Датчик температуры обмотки Pt100", "key": "sensor.windingQuantity"},
-    {"sheet": "Ques 2", "question": "Количество_Датчик температуры подшипников Pt100", "key": "sensor.bearingQuantity"}
+    {"sheet": "Ques 2", "question": "Количество_Датчик температуры подшипников Pt100", "key": "sensor.bearingQuantity"},
+    {"sheet": "Ques 2", "question": "Термоконтакт (биметаллический)", "key": "diagram2.thermal"},
+    {"sheet": "Ques 2", "question": "Термисторная защита (PTC)", "key": "diagram2.ptc"},
+    {"sheet": "Ques 2", "question": "Схема подключения Pt100_Датчик температуры обмотки Pt100", "key": "diagram2.windingWire"},
+    {"sheet": "Ques 2", "question": "Схема подключения Pt100_Датчик температуры подшипников Pt100", "key": "diagram2.bearingWire"}
   ],
   "optionalQuantities": {
     "windingWire": "sensor.windingQuantity",

@@ -1,4 +1,5 @@
 import ruleBase from '@/data/motor-v2.json';
+import bindings from '@/data/motor-field-bindings.json';
 
 export type QuestionNode = {
   sheet: string;
@@ -48,6 +49,19 @@ const normalize = (value: unknown) =>
   String(value || '')
     .trim()
     .toLocaleLowerCase('ru');
+
+/** Resolves engineering meaning without making Excel row/order a business key. */
+export function semanticKey(node: QuestionNode) {
+  return (
+    node.engineKey ||
+    bindings.fields.find(
+      (binding) =>
+        binding.sheet === node.sheet &&
+        normalize(binding.question) === normalize(node.question),
+    )?.key ||
+    null
+  );
+}
 
 export const initialQuestionnaireState: QuestionnaireState = {
   selected: {},
@@ -104,7 +118,7 @@ export function visibleQuestionGroups(state: QuestionnaireState) {
   // Roots and transitions are an OL graph: changing `order` plus `binds` in
   // Excel changes the visible questionnaire without a TypeScript release.
   const referenced = new Set(nodes.flatMap((node) => splitBinds(node.binds)));
-  const active = new Set(
+  const distance = new Map(
     nodes
       .filter(
         (node) =>
@@ -112,13 +126,14 @@ export function visibleQuestionGroups(state: QuestionnaireState) {
           !referenced.has(node.order) &&
           normalize(node.answer) !== 'unused',
       )
-      .map((node) => node.order),
+      .map((node) => [node.order, 0]),
   );
   let changed = true;
   while (changed) {
     changed = false;
     for (const node of nodes) {
-      if (!active.has(node.order)) continue;
+      const nodeDistance = distance.get(node.order);
+      if (nodeDistance === undefined) continue;
       let shouldFollow = false;
       if (selectorTypes.has(node.fieldType || ''))
         shouldFollow = state.selected[groupKey(node)] === node.order;
@@ -131,17 +146,40 @@ export function visibleQuestionGroups(state: QuestionnaireState) {
       if (node.fieldType === 'uploadButton')
         shouldFollow = Boolean(state.uploads[nodeKey(node)]);
       if (!shouldFollow) continue;
-      for (const order of splitBinds(node.binds))
-        if (byOrder.has(order) && !active.has(order)) {
-          active.add(order);
+      for (const order of splitBinds(node.binds)) {
+        const nextDistance = nodeDistance + 1;
+        if (
+          byOrder.has(order) &&
+          (distance.get(order) === undefined ||
+            nextDistance < distance.get(order)!)
+        ) {
+          distance.set(order, nextDistance);
           changed = true;
         }
+      }
     }
   }
+  const activeNodes = nodes.filter(
+    (node) => distance.has(node.order) && node.question && node.fieldType,
+  );
+  // A shared graph node can make a generic downstream input and a more
+  // specific branch input visible together. Keep the closest semantic input:
+  // the direct branch is the one that owns its range/validation.
+  const closestSemanticInput = new Map<string, number>();
+  for (const node of activeNodes) {
+    const key = node.fieldType === 'input' ? semanticKey(node) : null;
+    const nodeDistance = distance.get(node.order)!;
+    if (key && nodeDistance < (closestSemanticInput.get(key) ?? Infinity))
+      closestSemanticInput.set(key, nodeDistance);
+  }
   const groups = new Map<string, VisibleGroup>();
-  for (const node of nodes.filter(
-    (item) => active.has(item.order) && item.question && item.fieldType,
-  )) {
+  for (const node of activeNodes) {
+    const semanticInput = node.fieldType === 'input' ? semanticKey(node) : null;
+    if (
+      semanticInput &&
+      distance.get(node.order)! > closestSemanticInput.get(semanticInput)!
+    )
+      continue;
     const key = selectorTypes.has(node.fieldType || '')
       ? groupKey(node)
       : nodeKey(node);
@@ -228,8 +266,9 @@ export function engineSelections(state: QuestionnaireState, prefix: string) {
   for (const node of visibleQuestionGroups(state).flatMap(
     (group) => group.nodes,
   )) {
-    if (!node.engineKey?.startsWith(prefix)) continue;
-    const key = node.engineKey.slice(prefix.length);
+    const resolvedKey = semanticKey(node);
+    if (!resolvedKey?.startsWith(prefix)) continue;
+    const key = resolvedKey.slice(prefix.length);
     if (selectorTypes.has(node.fieldType || '')) {
       const selected = state.selected[groupKey(node)];
       if (selected === node.order && node.answer) result.set(key, node.answer);
