@@ -7,6 +7,7 @@ const jiti = createJiti(import.meta.url, { alias: { '@': root } });
 const q = await jiti.import('../lib/questionnaire.ts');
 const { calculateCabinet } = await jiti.import('../lib/cabinet-engine.ts');
 const { allocateControllerIo } = await jiti.import('../lib/io-allocator.ts');
+const { createClientId } = await jiti.import('../lib/client-id.ts');
 
 function complete(withSensors = false) {
   const state = structuredClone(q.initialQuestionnaireState);
@@ -119,4 +120,12 @@ test('analog I/O counted; malformed or unknown I/O fields rejected', () => {
   assert.equal(result.allocations[0].channels.length, 3);
   assert.ok(allocateControllerIo([{ id: 'bad', candidates: [{ sourceRow: 1, io: { di0: -1 } }] }]).error);
   assert.ok(allocateControllerIo([{ id: 'bad', candidates: [{ sourceRow: 1, io: { unknown: 1 } }] }]).error);
+});
+
+test('block id generation works on HTTP where crypto.randomUUID is unavailable', () => {
+  const first = createClientId(null);
+  const second = createClientId(null);
+  assert.match(first, /^local-[a-z0-9]+-[a-z0-9]+$/);
+  assert.notEqual(first, second);
+  assert.equal(createClientId(() => 'native-id'), 'native-id');
 });

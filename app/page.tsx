@@ -26,6 +26,7 @@ import {
   type VisibleGroup,
 } from '@/lib/questionnaire';
 import { calculateCabinet } from '@/lib/cabinet-engine';
+import { createClientId } from '@/lib/client-id';
 
 const COLUMNS = 8;
 const ROWS = 5;
@@ -105,7 +106,7 @@ export default function Home() {
   );
   const schemeCodes = activeInstances.map((item) => item.code);
   const addMotor = (preferredCell = START_CELL, openSheet = false) => {
-    const id = crypto.randomUUID();
+    const id = createClientId();
     setMotors((current) => {
       if (current.length >= CELLS) return current;
       const cell = current.some((motor) => motor.cell === preferredCell)
