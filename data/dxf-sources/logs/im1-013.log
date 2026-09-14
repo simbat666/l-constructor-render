@@ -1,0 +1,58 @@
+Attribute Qt::AA_PluginApplication must be set before QCoreApplication is created.
+Redirect stdout (file: /var/tmp/accc5326Uuyyzm).
+AcCoreConsole: StdOutConsoleMode: processed-output: enabled,auto
+AutoCAD Core Engine Console - Copyright 2026 Autodesk, Inc.  All rights reserved. (X.60.M.171)
+
+Execution Path:
+/Applications/Autodesk/AutoCAD 2027/AutoCAD 2027.app/Contents/Helpers/AcCoreConsole.app
+Current Directory: /Users/dmitrijmitin/Documents/ChatGPT/sdf/data/dxf-sources
+
+Version Number: X.60.M.171 (UNICODE)
+LogFilePath has been set to the working folder.
+.
+Substituting [simplex.shx] for [GOST Common].
+Substituting [simplex.shx] for [GOST Common].
+Substituting [simplex.shx] for [win_eskd.shx].Missing font.  Text may not plot
+Regenerating model.
+AutoCAD menu utilities loaded.
+Command: 
+Command: 
+Command: 
+Command: (setvar "FILEDIA" 0)
+0
+Command: (setvar "CMDECHO" 1)
+1
+Command: (setvar "LOGFILEMODE" 1)
+1
+Command: (setvar "EXPERT" 5)
+5
+Command: _.AUDIT
+Fix any errors detected? [Yes/No] <N>: _N
+                                       
+                                       
+                              
+Pass 1 100     objects audited
+                              
+Pass 2 100     objects audited
+                                      
+ 2       Blocks audited
+                                  
+Total errors found 0 fixed 0
+Erased 0 objects
+Command: _.DXFOUT
+Enter DXF file name </Users/dmitrijmitin/Documents/ChatGPT/sdf/data/cad-sources/im1-013.dxf>: /Users/dmitrijmitin/Documents/ChatGPT/sdf/data/dxf-sources/im1-013.dxf
+Current DXF settings: Precision= 16 Format= ASCII Preview= No Version= 2018 
+Enter decimal places of accuracy (0 to 16) or [Binary/select Objects/Preview/Version] <16>: _Version
+Enter version [R12(LT2)/2000(LT2000)/2004(LT2004)/2007(LT2007)/2010(LT2010)/2013(LT2013)/2018(LT2018)] <2018>: _2018
+Enter decimal places of accuracy (0 to 16) or [Binary/select Objects/Preview/Version] <16>: 16
+Command: (setq f (open "/var/folders/p4/brp8w7w51vgbry6bqcn3_pxc0000gn/T/l-cad-im1-013.w4nbnu5l/convert.done" "w"))
+#<file "/var/folders/p4/brp8w7w51vgbry6bqcn3_pxc0000gn/T/l-cad-im1-013.w4nbnu5l/convert.done">
+Command: (write-line "CONVERT_OK" f)
+"CONVERT_OK"
+Command: (close f)
+nil
+Command: _.QUIT
+_Y
+Really want to discard all changes to drawing? <N> _Y
+Command: 
+.QUITLogFilePath has been restored to ''.

@@ -1,0 +1,16 @@
+{
+  "description": "Fallback semantic bindings for the current workbook; Engine key takes precedence. Never bind business meaning to sourceRow or order.",
+  "fields": [
+    {"sheet": "Ques 1", "question": "Номинальный ток , А", "key": "motor.ratedCurrent"},
+    {"sheet": "Ques 1", "question": "Электрическая номинальная мощность, кВт", "key": "motor.ratedPower"},
+    {"sheet": "Ques 1", "question": "Способ выбора", "key": "vfd.selection"},
+    {"sheet": "Ques 1", "question": "Входной ток ЧП", "key": "vfd.inputCurrent"},
+    {"sheet": "Ques 3", "question": "Модель / Код заказа", "key": "vfd.model"},
+    {"sheet": "Ques 2", "question": "Количество__Датчик температуры обмотки Pt100", "key": "sensor.windingQuantity"},
+    {"sheet": "Ques 2", "question": "Количество_Датчик температуры подшипников Pt100", "key": "sensor.bearingQuantity"}
+  ],
+  "optionalQuantities": {
+    "windingWire": "sensor.windingQuantity",
+    "bearingWire": "sensor.bearingQuantity"
+  }
+}

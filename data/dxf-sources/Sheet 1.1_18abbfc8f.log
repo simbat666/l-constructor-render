@@ -1,0 +1,46 @@
+[ AutoCAD - Thu Sep 10 20:33:41 2026  ]----------------------------------------
+1
+
+Command: (setvar "EXPERT" 5)
+5
+
+Command: _.AUDIT
+
+Fix any errors detected? [Yes/No] <N>: _N
+
+
+
+Auditing Header
+                                       
+
+Auditing Tables
+                                       
+
+Auditing Entities Pass 1
+                              
+Pass 1 300     objects audited
+Auditing Entities Pass 2
+                              
+Pass 2 300     objects audited
+Auditing Blocks 
+                                      
+ 2       Blocks audited
+
+
+
+Auditing AcDsRecords
+                                  
+
+Total errors found 0 fixed 0
+
+Erased 0 objects
+
+
+Command: _.DXFOUT
+Enter DXF file name </var/folders/p4/brp8w7w51vgbry6bqcn3_pxc0000gn/T/l-frames-o8lfhbub/Sheet 1.1.dxf>: /Users/dmitrijmitin/Documents/ChatGPT/sdf/data/dxf-frames/Sheet 
+Current DXF settings: Precision= 16 Format= ASCII Preview= No Version= 2018 
+
+Enter decimal places of accuracy (0 to 16) or [Binary/select Objects/Preview/Version] <16>: 1.1.dxf
+
+Requires an integer between 0 and 16, or option keyword.
+

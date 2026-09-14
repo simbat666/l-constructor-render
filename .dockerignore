@@ -1,0 +1,10 @@
+.git
+.next
+.vinext
+node_modules
+dist
+output/generated
+.env
+.env.*
+.netlify
+.openai

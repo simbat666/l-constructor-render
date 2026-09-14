@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: l-constructor-demo
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/cad/healthz

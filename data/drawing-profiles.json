@@ -1,0 +1,24 @@
+{
+  "electrical": {
+    "title": "Схема электрическая принципиальная",
+    "frame": "sheet-1-1.dxf",
+    "sha256": "1efdc7815efff72d6649344b88fa6fc8e5df7f8e49fa544f18779f11215efa46",
+    "origin": [4432.996401408036, 5888.249978156903],
+    "sourceOriginY": 5888.249978156903,
+    "left": 40, "right": 400, "bottom": 25, "top": 287, "gap": 8, "verticalOffset": 0,
+    "numberAnchor": {"handle": "129B", "text": "1"},
+    "documentAnchor": {"handle": "128E", "text": "Номер документа"},
+    "excludeOutsidePage": false
+  },
+  "external": {
+    "title": "Схема внешних соединений",
+    "frame": "sheet-1-2.dxf",
+    "sha256": "d6bee56731e3f399d01458f2433c342b3833acd5fe25d28eadb2856e3f582b1e",
+    "origin": [3761.808745273493, 5888.249978156903],
+    "sourceOriginY": 5888.249978156903,
+    "left": 40, "right": 400, "bottom": 25, "top": 287, "gap": 8, "verticalOffset": 10,
+    "numberAnchor": {"handle": "13AD", "text": "2"},
+    "documentAnchor": {"handle": "13AB", "text": "Номер документа"},
+    "excludeOutsidePage": true
+  }
+}
