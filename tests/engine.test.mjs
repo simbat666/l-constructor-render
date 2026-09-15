@@ -29,6 +29,43 @@ function complete(withSensors = false) {
   return state;
 }
 
+function completeVfd(selection) {
+  const state = structuredClone(q.initialQuestionnaireState);
+  const select = (question, answer, sheet) => {
+    const group = q.visibleQuestionGroups(state).find(
+      (item) => item.question === question && (!sheet || item.sheet === sheet),
+    );
+    assert.ok(group, `missing question: ${question}`);
+    const node = group.nodes.find((item) => item.answer === answer);
+    assert.ok(node, `missing answer ${answer} for ${question}`);
+    state.selected[group.key] = node.order;
+  };
+  const input = (question, value) => {
+    const group = q.visibleQuestionGroups(state).find(
+      (item) => item.question === question,
+    );
+    assert.ok(group, `missing question: ${question}`);
+    const node = group.nodes[0];
+    state.inputs[`${node.sheet}:${node.order}`] = value;
+  };
+  select('Способ пуска / управления двигателем', 'Пуск через ЧП');
+  select('Расположение (ЧП / Симисторный регулятор скорости)', 'Внутри шкафа');
+  select('Способ подбора ЧП', selection);
+  if (selection === 'Автоматический')
+    select('Производитель (бренд) / Серия (Тип)', 'VEDA 1', 'Ques 1');
+  select('Номинальное напряжение, В', '400 (3L/PE)');
+  input('Номинальный ток , А', '3.2');
+  input('Электрическая номинальная мощность, кВт', '1.5');
+  if (selection === 'Автоматический') input('Процент запаса ЧП по току, %', '10');
+  select('Статус нагрузки', 'Основная ');
+  if (selection === 'Ручной') {
+    select('Производитель (бренд) / Серия (Тип)', 'VEDA 1', 'Ques 3');
+    select('Модель / Код заказа', 'VEDA 1-2', 'Ques 3');
+  }
+  assert.deepEqual(q.missingRequiredAnswers(state), []);
+  return state;
+}
+
 test('direct motor has a single logical selection, load index and traced specification', () => {
   const result = calculateCabinet([{ id: 'one', tag: 'M1', state: complete() }]);
   assert.equal(result.canExport, true, JSON.stringify(result.errors));
@@ -85,6 +122,40 @@ test('new manual VFD branch exposes the dedicated 5.3 voltage and 6.3 current ru
   assert.deepEqual(currents.map(item => item.nodes[0].order), ['6.3']);
   assert.equal(currents[0].nodes[0].inputRule, 'float|0.1..162.0|0.1');
   assert.equal(q.engineSelections(state, 'diagram1.').get('voltage'), '400 (3L/PE)');
+});
+
+test('manual VFD selects its load index and drive directly from sp1', () => {
+  const result = calculateCabinet([
+    { id: 'one', tag: 'M1', state: completeVfd('Ручной') },
+  ]);
+  const block = result.blocks[0];
+  assert.equal(result.canExport, true, JSON.stringify(result.errors));
+  assert.equal(block.loadIndex, 'M3PM00400');
+  assert.deepEqual(
+    block.specification.map((item) => [item.name, item.source]),
+    [
+      ['GM2L08', 'sp4:791'],
+      ['VEDA 1-2', 'sp1:3'],
+    ],
+  );
+  assert.deepEqual(block.warnings, []);
+});
+
+test('automatic VFD applies reserve, resolves Load index 2, then selects sp2', () => {
+  const result = calculateCabinet([
+    { id: 'one', tag: 'M1', state: completeVfd('Автоматический') },
+  ]);
+  const block = result.blocks[0];
+  assert.equal(result.canExport, true, JSON.stringify(result.errors));
+  assert.equal(block.loadIndex, 'M3PM00400');
+  assert.deepEqual(
+    block.specification.map((item) => [item.name, item.source]),
+    [
+      ['GM2L08', 'sp4:791'],
+      ['VEDA 1-2', 'sp2:7'],
+    ],
+  );
+  assert.deepEqual(block.warnings, []);
 });
 
 test('two identical motors retain every occurrence and unique logical addresses', () => {

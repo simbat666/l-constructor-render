@@ -42,6 +42,12 @@ type Demand = {
   source: string;
   candidates: SchemeRow[];
 };
+type LoadCandidate = {
+  sourceRow: number;
+  loadIndex: string;
+  currentFrom: number;
+  currentTo: number;
+};
 const normalized = (value: unknown) =>
   String(value ?? '')
     .trim()
@@ -68,6 +74,23 @@ function semanticFields(state: QuestionnaireState) {
     ]);
   }
   return fields;
+}
+
+function fieldValue(
+  fields: Map<string, Array<{ value: string | boolean; source: string }>>,
+  key: string,
+) {
+  const values = fields.get(key) || [];
+  return values.length === 1 ? String(values[0].value) : null;
+}
+
+function singleRange<Row extends { currentFrom: number; currentTo: number }>(
+  rows: Row[],
+  current: number,
+) {
+  return rows.filter(
+    (row) => current >= row.currentFrom && current <= row.currentTo,
+  );
 }
 
 export function calculateCabinet(motors: MotorInstance[]) {
@@ -219,15 +242,82 @@ export function calculateCabinet(motors: MotorInstance[]) {
     if (!block.main) continue;
     const main = block.main;
     const rated = Number(block.fields.get('motor.ratedCurrent')?.[0]?.value);
-    // Copy code meanings from the chosen source row: never infer them from order.
-    const candidates = base.loadIndex1.filter(
-      (row) =>
-        row.startCode === main.startCode &&
-        row.voltageCode === main.voltageCode &&
-        row.tripCode === main.tripCode &&
-        rated >= row.currentFrom &&
-        rated <= row.currentTo,
-    );
+    const start = fieldValue(block.fields, 'diagram1.start');
+    const location = fieldValue(block.fields, 'diagram1.location');
+    const vfdSelection = fieldValue(block.fields, 'vfd.selection');
+    const isVfd = normalized(start) === normalized('Пуск через ЧП');
+    let candidates: LoadCandidate[] = [];
+    let vfd: (typeof base.manualVfd)[number] | (typeof base.automaticVfd)[number] | null = null;
+    let vfdSource: 'sp1' | 'sp2' | null = null;
+    let indexSource = 'Load index 1';
+
+    if (!isVfd) {
+      // Copy code meanings from the chosen source row: never infer them from order.
+      candidates = singleRange(
+        base.loadIndex1.filter(
+          (row) =>
+            row.startCode === main.startCode &&
+            row.voltageCode === main.voltageCode &&
+            row.tripCode === main.tripCode,
+        ),
+        rated,
+      );
+    } else if (
+      normalized(location) === normalized('Внутри шкафа') &&
+      normalized(vfdSelection) === normalized('Ручной')
+    ) {
+      indexSource = 'sp1';
+      const model = fieldValue(block.fields, 'vfd.model');
+      const matches = base.manualVfd.filter(
+        (row) =>
+          normalized(row.location) === normalized(location) &&
+          normalized(row.selection) === normalized(vfdSelection) &&
+          normalized(row.model) === normalized(model),
+      );
+      if (matches.length === 1) {
+        vfd = matches[0];
+        vfdSource = 'sp1';
+        candidates = [{ ...matches[0], currentFrom: rated, currentTo: rated }];
+      } else {
+        block.warnings.push(
+          matches.length
+            ? `Выбранная модель ЧП в sp1 неоднозначна: строки ${matches.map((row) => row.sourceRow).join(', ')}.`
+            : 'В sp1 нет однозначного ЧП для выбранной ручной модели.',
+        );
+      }
+    } else {
+      indexSource = 'Load index 2';
+      const inputCurrent =
+        normalized(location) === normalized('Внутри шкафа')
+          ? rated * (1 + Number(fieldValue(block.fields, 'vfd.reserve') || 0) / 100)
+          : Number(fieldValue(block.fields, 'vfd.inputCurrent'));
+      const indexRows = base.loadIndex2.filter(
+        (row) =>
+          row.startCode === main.startCode &&
+          row.voltageCode === main.voltageCode &&
+          (!vfdSelection || normalized(row.selection) === normalized(vfdSelection)),
+      );
+      candidates = singleRange(indexRows, inputCurrent);
+      if (candidates.length === 1 && normalized(location) === normalized('Внутри шкафа')) {
+        const brand = fieldValue(block.fields, 'vfd.brand');
+        const matches = base.automaticVfd.filter(
+          (row) =>
+            normalized(row.location) === normalized(location) &&
+            normalized(row.selection) === normalized(vfdSelection) &&
+            normalized(row.brand) === normalized(brand) &&
+            row.loadIndex === candidates[0].loadIndex,
+        );
+        if (matches.length === 1) {
+          vfd = matches[0];
+          vfdSource = 'sp2';
+        } else
+          block.warnings.push(
+            matches.length
+              ? `Подбор ЧП из sp2 неоднозначен: строки ${matches.map((row) => row.sourceRow).join(', ')}.`
+              : 'В sp2 нет ЧП для выбранного бренда и индекса нагрузки.',
+          );
+      }
+    }
     if (candidates.length === 1) {
       block.loadIndex = candidates[0].loadIndex;
       block.specification = base.mainSpecification
@@ -245,11 +335,18 @@ export function calculateCabinet(motors: MotorInstance[]) {
         block.warnings.push(
           `Нет спецификации sp4 для ${main.diagram1} + ${block.loadIndex}.`,
         );
-    } else
+      if (vfd && vfdSource)
+        block.specification.push({
+          name: vfd.name,
+          quantity: vfd.quantity,
+          unit: vfd.unit,
+          source: `${vfdSource}:${vfd.sourceRow}`,
+        });
+    } else if (!block.warnings.length)
       block.warnings.push(
         candidates.length
-          ? `Граница диапазонов Load index 1 неоднозначна: строки ${candidates.map((row) => row.sourceRow).join(', ')}. Индекс не угадан.`
-          : 'Индекс нагрузки не рассчитан: нет однозначного правила Load index 1. Для ЧП требуется отдельная проверенная стратегия sp1 / sp2 / Load index 2.',
+          ? `Граница диапазонов ${indexSource} неоднозначна: строки ${candidates.map((row) => row.sourceRow).join(', ')}. Индекс не угадан.`
+          : `Индекс нагрузки не рассчитан: нет однозначного правила ${indexSource}.`,
       );
     for (const optional of block.optional) {
       const rows = base.sensorSpecification.filter(
