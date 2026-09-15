@@ -48,10 +48,23 @@ type LoadCandidate = {
   currentFrom: number;
   currentTo: number;
 };
+type DecisionTraceEntry = {
+  id: string;
+  title: string;
+  detail: string;
+  source?: string;
+};
+type LoadRuleTrace = {
+  title: string;
+  detail: string;
+  source: string;
+};
 const normalized = (value: unknown) =>
   String(value ?? '')
     .trim()
     .toLocaleLowerCase('ru');
+const amperes = (value: number) =>
+  Number.isFinite(value) ? String(Math.round(value * 1000) / 1000) : 'не указан';
 
 /** The graph resolves visibility. Semantic keys resolve engineering meaning. */
 function semanticFields(state: QuestionnaireState) {
@@ -158,6 +171,7 @@ export function calculateCabinet(motors: MotorInstance[]) {
       optional: [] as Array<{ row: SchemeRow; sourceOrder: string }>,
       channels: [] as Channel[],
       loadIndex: null as string | null,
+      loadRule: null as LoadRuleTrace | null,
       specification: [] as Array<{
         name: string;
         quantity: number;
@@ -250,6 +264,8 @@ export function calculateCabinet(motors: MotorInstance[]) {
     let vfd: (typeof base.manualVfd)[number] | (typeof base.automaticVfd)[number] | null = null;
     let vfdSource: 'sp1' | 'sp2' | null = null;
     let indexSource = 'Load index 1';
+    let loadRuleTitle = 'Подбор индекса нагрузки';
+    let loadRuleDetail = `Номинальный ток двигателя: ${amperes(rated)} А.`;
 
     if (!isVfd) {
       // Copy code meanings from the chosen source row: never infer them from order.
@@ -268,6 +284,8 @@ export function calculateCabinet(motors: MotorInstance[]) {
     ) {
       indexSource = 'sp1';
       const model = fieldValue(block.fields, 'vfd.model');
+      loadRuleTitle = 'Ручной подбор ЧП';
+      loadRuleDetail = `Выбранная модель ЧП: ${model || 'не указана'}. Индекс берётся из той же строки sp1.`;
       const matches = base.manualVfd.filter(
         (row) =>
           normalized(row.location) === normalized(location) &&
@@ -291,6 +309,15 @@ export function calculateCabinet(motors: MotorInstance[]) {
         normalized(location) === normalized('Внутри шкафа')
           ? rated * (1 + Number(fieldValue(block.fields, 'vfd.reserve') || 0) / 100)
           : Number(fieldValue(block.fields, 'vfd.inputCurrent'));
+      const reserve = Number(fieldValue(block.fields, 'vfd.reserve') || 0);
+      loadRuleTitle =
+        normalized(location) === normalized('Внутри шкафа')
+          ? 'Автоматический подбор ЧП'
+          : 'Подбор внешнего ЧП';
+      loadRuleDetail =
+        normalized(location) === normalized('Внутри шкафа')
+          ? `Номинальный ток ${amperes(rated)} А + запас ${reserve}% = ${amperes(inputCurrent)} А. Значение сверяется с диапазоном Load index 2.`
+          : `Введён входной ток ЧП: ${amperes(inputCurrent)} А. Значение сверяется с диапазоном Load index 2.`;
       const indexRows = base.loadIndex2.filter(
         (row) =>
           row.startCode === main.startCode &&
@@ -320,6 +347,11 @@ export function calculateCabinet(motors: MotorInstance[]) {
     }
     if (candidates.length === 1) {
       block.loadIndex = candidates[0].loadIndex;
+      block.loadRule = {
+        title: loadRuleTitle,
+        detail: `${loadRuleDetail} Получен индекс ${block.loadIndex}.`,
+        source: `${indexSource}:${candidates[0].sourceRow}`,
+      };
       block.specification = base.mainSpecification
         .filter(
           (row) =>
@@ -370,7 +402,67 @@ export function calculateCabinet(motors: MotorInstance[]) {
     schemaVersion: 1,
     ruleFingerprint: questionnaireFingerprint,
     status: 'draft' as const,
-    blocks: blocks.map(({ fields: _fields, ...block }) => block),
+    blocks: blocks.map(({ fields: _fields, loadRule, ...block }) => {
+      const inputs: DecisionTraceEntry[] = activeAnswers(block.state).map(
+        (answer) => ({
+          id: `${answer.sheet}:${answer.order}`,
+          title: answer.question || answer.order,
+          detail:
+            typeof answer.value === 'boolean'
+              ? answer.value
+                ? 'Да'
+                : 'Нет'
+              : String(answer.value),
+          source: `${answer.sheet}:${answer.sourceRow}`,
+        }),
+      );
+      const rules: DecisionTraceEntry[] = [];
+      if (block.main)
+        rules.push({
+          id: `diagram1:${block.main.sourceRow}`,
+          title: 'Выбор основной схемы',
+          detail: `Сочетание активных ответов выбрало ${block.main.diagram1 || 'принципиальную схему не указано'}${block.main.diagram2 ? ` и ${block.main.diagram2}` : ''}.`,
+          source: `diagram 1:${block.main.sourceRow}`,
+        });
+      if (loadRule)
+        rules.push({
+          id: `load:${loadRule.source}`,
+          title: loadRule.title,
+          detail: loadRule.detail,
+          source: loadRule.source,
+        });
+      for (const optional of block.optional)
+        rules.push({
+          id: `diagram2:${optional.row.sourceRow}:${optional.sourceOrder}`,
+          title: 'Дополнительный сигнал',
+          detail: `Выбрана схема ${optional.row.diagram1 || optional.row.diagram2 || 'без кода'}.`,
+          source: `diagram 2:${optional.row.sourceRow}`,
+        });
+      const outputs: DecisionTraceEntry[] = [];
+      if (block.loadIndex)
+        outputs.push({
+          id: 'load-index',
+          title: 'Индекс нагрузки',
+          detail: block.loadIndex,
+          source: loadRule?.source,
+        });
+      if (block.channels.length)
+        outputs.push({
+          id: 'io',
+          title: 'Логические I/O',
+          detail: block.channels
+            .map((channel) => `${channel.address} · ${channel.family}`)
+            .join(', '),
+        });
+      for (const item of block.specification)
+        outputs.push({
+          id: `spec:${item.source}:${item.name}`,
+          title: item.name,
+          detail: `${item.quantity} ${item.unit}`,
+          source: item.source,
+        });
+      return { ...block, decisionTrace: { inputs, rules, outputs } };
+    }),
     instances,
     errors,
     warnings: [

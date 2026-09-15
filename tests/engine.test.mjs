@@ -138,6 +138,18 @@ test('manual VFD selects its load index and drive directly from sp1', () => {
       ['VEDA 1-2', 'sp1:3'],
     ],
   );
+  assert.deepEqual(
+    block.decisionTrace.rules.map((item) => [item.title, item.source]),
+    [
+      ['Выбор основной схемы', 'diagram 1:42'],
+      ['Ручной подбор ЧП', 'sp1:3'],
+    ],
+  );
+  assert.ok(
+    block.decisionTrace.inputs.some(
+      (item) => item.title === 'Модель / Код заказа' && item.detail === 'VEDA 1-2',
+    ),
+  );
   assert.deepEqual(block.warnings, []);
 });
 
@@ -154,6 +166,22 @@ test('automatic VFD applies reserve, resolves Load index 2, then selects sp2', (
       ['GM2L08', 'sp4:791'],
       ['VEDA 1-2', 'sp2:7'],
     ],
+  );
+  assert.deepEqual(
+    block.decisionTrace.rules.map((item) => [item.title, item.source]),
+    [
+      ['Выбор основной схемы', 'diagram 1:42'],
+      ['Автоматический подбор ЧП', 'Load index 2:7'],
+    ],
+  );
+  assert.match(
+    block.decisionTrace.rules[1].detail,
+    /Номинальный ток 3.2 А \+ запас 10% = 3.52 А/,
+  );
+  assert.ok(
+    block.decisionTrace.outputs.some(
+      (item) => item.title === 'VEDA 1-2' && item.source === 'sp2:7',
+    ),
   );
   assert.deepEqual(block.warnings, []);
 });

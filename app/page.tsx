@@ -41,6 +41,17 @@ const sheetTitles: Record<string, string> = {
 };
 type DiagramRow = Record<string, any>;
 type OptionalRow = { row: DiagramRow; sourceOrder: string };
+type DecisionTraceEntry = {
+  id: string;
+  title: string;
+  detail: string;
+  source?: string;
+};
+type DecisionTraceData = {
+  inputs: DecisionTraceEntry[];
+  rules: DecisionTraceEntry[];
+  outputs: DecisionTraceEntry[];
+};
 type DrawingDownload = { kind: string; title: string; downloadPath: string };
 type Generation =
   | { status: 'idle' }
@@ -479,23 +490,10 @@ export default function Home() {
           onGenerate={generateDxf}
           calculationSummary={
             calculatedMotor && (
-              <div className="mt-6 space-y-3 text-xs leading-5">
-                <p className="font-semibold">
-                  Индекс нагрузки: {calculatedMotor.loadIndex || 'не определён'}
-                </p>
-                <p>
-                  Строк спецификации: {calculatedMotor.specification.length}.
-                  Подробности и источники — в расчёте JSON.
-                </p>
-                {calculatedMotor.warnings.map((warning) => (
-                  <p
-                    key={warning}
-                    className="rounded-xl bg-[#fff4ee] p-3 text-[#9a5635]"
-                  >
-                    {warning}
-                  </p>
-                ))}
-              </div>
+              <DecisionTrace
+                trace={calculatedMotor.decisionTrace}
+                warnings={calculatedMotor.warnings}
+              />
             )
           }
           onClose={() => setSheetOpen(false)}
@@ -1058,6 +1056,119 @@ function DiagramResult({
         </section>
       )}
     </div>
+  );
+}
+
+function sourceLabel(source?: string) {
+  if (!source) return null;
+  const [table, row] = source.split(':');
+  return row ? `${table} · строка ${row}` : source;
+}
+
+function TraceSection({
+  title,
+  caption,
+  entries,
+  empty,
+}: {
+  title: string;
+  caption: string;
+  entries: DecisionTraceEntry[];
+  empty: string;
+}) {
+  return (
+    <details open className="overflow-hidden rounded-2xl border border-[#e1dff0] bg-white">
+      <summary className="cursor-pointer list-none px-4 py-3 marker:hidden">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-[#403b55]">{title}</p>
+            <p className="mt-0.5 text-[11px] leading-4 text-[#85818f]">
+              {caption}
+            </p>
+          </div>
+          <span className="rounded-full bg-[#f0eeff] px-2 py-1 text-[10px] font-bold text-[#6d60d3]">
+            {entries.length}
+          </span>
+        </div>
+      </summary>
+      <div className="border-t border-[#eeeeF4] px-4 py-3">
+        {entries.length ? (
+          <ul className="space-y-2.5">
+            {entries.map((entry) => (
+              <li key={entry.id} className="rounded-xl bg-[#f8f8fc] px-3 py-2.5">
+                <div className="flex items-start justify-between gap-3">
+                  <p className="text-xs font-semibold leading-5 text-[#44424f]">
+                    {entry.title}
+                  </p>
+                  {entry.source && (
+                    <span className="shrink-0 rounded-md bg-[#eceafb] px-1.5 py-0.5 font-mono text-[10px] text-[#6d60d3]">
+                      {sourceLabel(entry.source)}
+                    </span>
+                  )}
+                </div>
+                <p className="mt-1 text-xs leading-5 text-[#6d6a76]">
+                  {entry.detail}
+                </p>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-xs leading-5 text-[#85818f]">{empty}</p>
+        )}
+      </div>
+    </details>
+  );
+}
+
+function DecisionTrace({
+  trace,
+  warnings,
+}: {
+  trace: DecisionTraceData;
+  warnings: string[];
+}) {
+  return (
+    <section className="mt-6 space-y-3 border-t border-[#e5e5ed] pt-6">
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-[.16em] text-[#7669dc]">
+          Карта решения
+        </p>
+        <h3 className="mt-1 text-lg font-semibold tracking-[-.03em] text-[#34323f]">
+          От ответов к результату
+        </h3>
+        <p className="mt-1 text-xs leading-5 text-[#777481]">
+          Активные ответы ведут к правилам из ОЛ, затем — к схемам, I/O и
+          спецификации. Строки показывают источник каждого решения.
+        </p>
+      </div>
+      <TraceSection
+        title="Входные данные"
+        caption="Только видимые ответы этого экземпляра"
+        entries={trace.inputs}
+        empty="Заполни опросник: скрытые ответы намеренно не учитываются."
+      />
+      <TraceSection
+        title="Сработавшие правила"
+        caption="Выбор схем и инженерных диапазонов"
+        entries={trace.rules}
+        empty="Правила появятся после выбора совместимой схемы."
+      />
+      <TraceSection
+        title="Выходные данные"
+        caption="Индекс, логические сигналы и состав"
+        entries={trace.outputs}
+        empty="Итог появится после заполнения обязательных параметров."
+      />
+      {warnings.map((warning) => (
+        <div
+          key={warning}
+          className="flex gap-2 rounded-xl bg-[#fff4ee] p-3 text-xs leading-5 text-[#9a5635]"
+        >
+          <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+          {warning}
+        </div>
+      ))}
+    </section>
   );
 }
 
