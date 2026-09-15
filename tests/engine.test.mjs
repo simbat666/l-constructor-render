@@ -7,7 +7,7 @@ const jiti = createJiti(import.meta.url, { alias: { '@': root } });
 const q = await jiti.import('../lib/questionnaire.ts');
 const { calculateCabinet } = await jiti.import('../lib/cabinet-engine.ts');
 const { allocateControllerIo } = await jiti.import('../lib/io-allocator.ts');
-const { createClientId } = await jiti.import('../lib/client-id.ts');
+const { createClientId, cloneQuestionnaireState } = await jiti.import('../lib/client-id.ts');
 
 function complete(withSensors = false) {
   const state = structuredClone(q.initialQuestionnaireState);
@@ -198,6 +198,20 @@ test('two identical motors retain every occurrence and unique logical addresses'
   const addresses = result.blocks.flatMap(block => block.channels.map(item => item.address));
   assert.equal(new Set(addresses).size, addresses.length);
   assert.ok(Object.values(result.io).reduce((sum, count) => sum + count, 0) > 4);
+});
+
+test('copied questionnaire state is independent from the source block', () => {
+  const source = completeVfd('Автоматический');
+  const copy = cloneQuestionnaireState(source);
+  copy.inputs['Ques 1:6.3'] = '6.4';
+  assert.equal(source.inputs['Ques 1:6.3'], '3.2');
+  assert.equal(copy.inputs['Ques 1:6.3'], '6.4');
+  const result = calculateCabinet([
+    { id: 'source', tag: 'M1', state: source },
+    { id: 'copy', tag: 'M2', state: copy },
+  ]);
+  assert.equal(result.blocks.length, 2);
+  assert.notEqual(result.blocks[0].id, result.blocks[1].id);
 });
 
 test('hidden sensor answers neither affect diagram selection nor survive pruning', () => {

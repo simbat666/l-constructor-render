@@ -15,3 +15,8 @@ export function createClientId(
   const randomPart = Math.random().toString(36).slice(2);
   return `local-${Date.now().toString(36)}-${randomPart}`;
 }
+
+/** A copied functional block must never share a mutable questionnaire state. */
+export function cloneQuestionnaireState<T>(state: T): T {
+  return structuredClone(state);
+}

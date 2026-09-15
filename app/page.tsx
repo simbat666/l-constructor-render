@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   ArrowUpRight,
   CircleCheck,
+  Copy,
   Download,
   FileCog,
   GripVertical,
@@ -26,7 +27,7 @@ import {
   type VisibleGroup,
 } from '@/lib/questionnaire';
 import { calculateCabinet } from '@/lib/cabinet-engine';
-import { createClientId } from '@/lib/client-id';
+import { cloneQuestionnaireState, createClientId } from '@/lib/client-id';
 
 const COLUMNS = 8;
 const ROWS = 5;
@@ -84,6 +85,17 @@ function blockCountLabel(count: number) {
   return `${String(count).padStart(2, '0')} ${ending}`;
 }
 
+function nextFreeCell(
+  motors: Array<Pick<MotorBlock, 'cell'>>,
+  preferredCell: number,
+) {
+  for (let offset = 0; offset < CELLS; offset++) {
+    const cell = (preferredCell + offset) % CELLS;
+    if (!motors.some((motor) => motor.cell === cell)) return cell;
+  }
+  return null;
+}
+
 export default function Home() {
   const [motors, setMotors] = useState<MotorBlock[]>([]);
   const [activeMotorId, setActiveMotorId] = useState<string | null>(null);
@@ -120,11 +132,8 @@ export default function Home() {
     const id = createClientId();
     setMotors((current) => {
       if (current.length >= CELLS) return current;
-      const cell = current.some((motor) => motor.cell === preferredCell)
-        ? (Array.from({ length: CELLS }, (_, index) => index).find(
-            (candidate) => !current.some((motor) => motor.cell === candidate),
-          ) ?? preferredCell)
-        : preferredCell;
+      const cell = nextFreeCell(current, preferredCell);
+      if (cell === null) return current;
       return [
         ...current,
         {
@@ -139,6 +148,29 @@ export default function Home() {
     });
     setActiveMotorId(id);
     if (openSheet) setSheetOpen(true);
+  };
+  const copyMotor = (sourceId: string) => {
+    if (motors.length >= CELLS || !motors.some((motor) => motor.id === sourceId))
+      return;
+    const id = createClientId();
+    setMotors((current) => {
+      const source = current.find((motor) => motor.id === sourceId);
+      const cell = source ? nextFreeCell(current, source.cell + 1) : null;
+      if (!source || cell === null) return current;
+      return [
+        ...current,
+        {
+          ...source,
+          id,
+          tag: `М${current.length + 1}`,
+          cell,
+          state: cloneQuestionnaireState(source.state),
+          generation: { status: 'idle' },
+        },
+      ];
+    });
+    setActiveMotorId(id);
+    setSheetOpen(true);
   };
   const moveMotor = (id: string, cell: number) =>
     setMotors((current) =>
@@ -374,32 +406,42 @@ export default function Home() {
             ) : (
               <div className="mt-5 space-y-2">
                 {motors.map((motor) => (
-                  <button
+                  <div
                     key={motor.id}
-                    onClick={() => {
-                      setActiveMotorId(motor.id);
-                      setSheetOpen(true);
-                    }}
                     className="l-glow w-full rounded-2xl bg-white p-4 text-left transition hover:-translate-y-0.5"
                   >
-                    <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => {
+                        setActiveMotorId(motor.id);
+                        setSheetOpen(true);
+                      }}
+                      className="flex w-full items-center gap-3 text-left"
+                    >
                       <span className="motor-thumb l-block-gradient grid size-11 overflow-hidden rounded-xl">
                         <img
                           src="/assets/asynchronous-motor-v1.png"
                           alt="Асинхронный электродвигатель"
                         />
                       </span>
-                      <div>
-                        <p className="text-sm font-semibold">
+                      <span>
+                        <span className="block text-sm font-semibold">
                           Асинхронный двигатель
-                        </p>
-                        <p className="mt-0.5 text-xs text-[#747480]">
+                        </span>
+                        <span className="mt-0.5 block text-xs text-[#747480]">
                           {motor.tag} · ОЛ {questionnaireRevision}
-                        </p>
-                      </div>
+                        </span>
+                      </span>
                       <ArrowUpRight className="ml-auto size-4 text-[#7669dc]" />
-                    </div>
-                  </button>
+                    </button>
+                    <button
+                      onClick={() => copyMotor(motor.id)}
+                      className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-[#f0eeff] px-3 py-2 text-xs font-semibold text-[#6254ca] transition hover:bg-[#e7e3ff]"
+                      title={`Создать независимую копию ${motor.tag}`}
+                    >
+                      <Copy className="size-3.5" />
+                      Копировать блок
+                    </button>
+                  </div>
                 ))}
               </div>
             )}
@@ -492,6 +534,7 @@ export default function Home() {
             calculatedMotor && (
               <DecisionTrace
                 trace={calculatedMotor.decisionTrace}
+                errors={calculatedMotor.errors}
                 warnings={calculatedMotor.warnings}
               />
             )
@@ -691,6 +734,7 @@ function QuestionnaireSheet({
   calculationSummary: ReactNode;
 }) {
   let activeSheet = '';
+  const [passportOpen, setPassportOpen] = useState(false);
   return (
     <div className="fixed inset-0 z-50 bg-[#1c1c29]/25 p-0 backdrop-blur-sm sm:p-5">
       <div className="ml-auto flex h-full w-full max-w-3xl flex-col bg-[#fbfbfe] shadow-[-20px_0_70px_rgba(28,29,44,.18)]">
@@ -706,13 +750,24 @@ function QuestionnaireSheet({
               </p>
             </div>
           </div>
-          <button
-            aria-label="Закрыть опросный лист"
-            onClick={onClose}
-            className="grid size-10 place-items-center rounded-xl bg-[#f0f0f5] text-lg text-[#62626e] hover:bg-[#e8e8ef]"
-          >
-            ×
-          </button>
+          <div className="flex items-center gap-2">
+            {calculationSummary && (
+              <button
+                onClick={() => setPassportOpen(true)}
+                className="flex h-10 items-center gap-2 rounded-xl bg-[#eeebff] px-3 text-xs font-semibold text-[#6254ca] hover:bg-[#e5e0ff]"
+              >
+                <FileCog className="size-4" />
+                Паспорт
+              </button>
+            )}
+            <button
+              aria-label="Закрыть опросный лист"
+              onClick={onClose}
+              className="grid size-10 place-items-center rounded-xl bg-[#f0f0f5] text-lg text-[#62626e] hover:bg-[#e8e8ef]"
+            >
+              ×
+            </button>
+          </div>
         </header>
         <div className="grid flex-1 overflow-y-auto lg:grid-cols-[1.05fr_.95fr]">
           <section className="p-5 sm:p-8">
@@ -781,10 +836,43 @@ function QuestionnaireSheet({
               generation={generation}
               onGenerate={onGenerate}
             />
-            {calculationSummary}
           </section>
         </div>
       </div>
+      {passportOpen && calculationSummary && (
+        <div
+          className="fixed inset-0 z-[60] grid place-items-center bg-[#1c1c29]/30 p-4 backdrop-blur-sm"
+          role="presentation"
+          onMouseDown={() => setPassportOpen(false)}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Паспорт блока ${motorTag}`}
+            onMouseDown={(event) => event.stopPropagation()}
+            className="max-h-[calc(100vh-2rem)] w-full max-w-[530px] overflow-y-auto rounded-[24px] border border-white bg-[#fbfbfe] p-5 shadow-[0_22px_70px_rgba(28,29,44,.28)] sm:p-6"
+          >
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[.16em] text-[#7669dc]">
+                  Проверка блока
+                </p>
+                <h3 className="mt-1 text-xl font-semibold tracking-[-.04em] text-[#34323f]">
+                  Паспорт {motorTag}
+                </h3>
+              </div>
+              <button
+                aria-label="Закрыть паспорт блока"
+                onClick={() => setPassportOpen(false)}
+                className="grid size-9 place-items-center rounded-xl bg-[#f0f0f5] text-lg text-[#62626e] hover:bg-[#e8e8ef]"
+              >
+                ×
+              </button>
+            </div>
+            {calculationSummary}
+          </section>
+        </div>
+      )}
     </div>
   );
 }
@@ -1070,14 +1158,16 @@ function TraceSection({
   caption,
   entries,
   empty,
+  defaultOpen = false,
 }: {
   title: string;
   caption: string;
   entries: DecisionTraceEntry[];
   empty: string;
+  defaultOpen?: boolean;
 }) {
   return (
-    <details open className="overflow-hidden rounded-2xl border border-[#e1dff0] bg-white">
+    <details open={defaultOpen} className="overflow-hidden rounded-2xl border border-[#e1dff0] bg-white">
       <summary className="cursor-pointer list-none px-4 py-3 marker:hidden">
         <div className="flex items-center justify-between gap-3">
           <div>
@@ -1122,16 +1212,30 @@ function TraceSection({
 
 function DecisionTrace({
   trace,
+  errors,
   warnings,
 }: {
   trace: DecisionTraceData;
+  errors: string[];
   warnings: string[];
 }) {
+  const issues: DecisionTraceEntry[] = [
+    ...errors.map((detail, index) => ({
+      id: `error:${index}:${detail}`,
+      title: 'Требует заполнения или исправления',
+      detail,
+    })),
+    ...warnings.map((detail, index) => ({
+      id: `warning:${index}:${detail}`,
+      title: 'Проверить перед выпуском',
+      detail,
+    })),
+  ];
   return (
-    <section className="mt-6 space-y-3 border-t border-[#e5e5ed] pt-6">
+    <section className="space-y-3">
       <div>
         <p className="text-xs font-semibold uppercase tracking-[.16em] text-[#7669dc]">
-          Карта решения
+          Входы и результаты
         </p>
         <h3 className="mt-1 text-lg font-semibold tracking-[-.03em] text-[#34323f]">
           От ответов к результату
@@ -1152,6 +1256,7 @@ function DecisionTrace({
         caption="Выбор схем и инженерных диапазонов"
         entries={trace.rules}
         empty="Правила появятся после выбора совместимой схемы."
+        defaultOpen
       />
       <TraceSection
         title="Выходные данные"
@@ -1159,15 +1264,12 @@ function DecisionTrace({
         entries={trace.outputs}
         empty="Итог появится после заполнения обязательных параметров."
       />
-      {warnings.map((warning) => (
-        <div
-          key={warning}
-          className="flex gap-2 rounded-xl bg-[#fff4ee] p-3 text-xs leading-5 text-[#9a5635]"
-        >
-          <TriangleAlert className="mt-0.5 size-4 shrink-0" />
-          {warning}
-        </div>
-      ))}
+      <TraceSection
+        title="Ошибки и проверки"
+        caption="Что блокирует подбор или требует внимания"
+        entries={issues}
+        empty="Ошибок и предупреждений для этого блока нет."
+      />
     </section>
   );
 }
