@@ -7,7 +7,7 @@ const jiti = createJiti(import.meta.url, { alias: { '@': root } });
 const q = await jiti.import('../lib/questionnaire.ts');
 const { calculateCabinet } = await jiti.import('../lib/cabinet-engine.ts');
 const { allocateControllerIo } = await jiti.import('../lib/io-allocator.ts');
-const { createClientId, cloneQuestionnaireState } = await jiti.import('../lib/client-id.ts');
+const { createClientId, cloneQuestionnaireState, removeBlockById } = await jiti.import('../lib/client-id.ts');
 
 function complete(withSensors = false) {
   const state = structuredClone(q.initialQuestionnaireState);
@@ -212,6 +212,19 @@ test('copied questionnaire state is independent from the source block', () => {
   ]);
   assert.equal(result.blocks.length, 2);
   assert.notEqual(result.blocks[0].id, result.blocks[1].id);
+});
+
+test('deleting a block removes only the requested instance', () => {
+  const source = [
+    { id: 'one', tag: 'M1' },
+    { id: 'two', tag: 'M2' },
+  ];
+  const result = removeBlockById(source, 'one');
+  assert.deepEqual(result, [{ id: 'two', tag: 'M2' }]);
+  assert.deepEqual(source, [
+    { id: 'one', tag: 'M1' },
+    { id: 'two', tag: 'M2' },
+  ]);
 });
 
 test('hidden sensor answers neither affect diagram selection nor survive pruning', () => {

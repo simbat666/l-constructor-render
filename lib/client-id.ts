@@ -20,3 +20,11 @@ export function createClientId(
 export function cloneQuestionnaireState<T>(state: T): T {
   return structuredClone(state);
 }
+
+/** Remove exactly one client-side block without mutating the remaining project. */
+export function removeBlockById<T extends { id: string }>(
+  blocks: T[],
+  id: string,
+) {
+  return blocks.filter((block) => block.id !== id);
+}

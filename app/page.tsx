@@ -11,6 +11,7 @@ import {
   Layers3,
   LoaderCircle,
   Plus,
+  Trash2,
   TriangleAlert,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -27,7 +28,11 @@ import {
   type VisibleGroup,
 } from '@/lib/questionnaire';
 import { calculateCabinet } from '@/lib/cabinet-engine';
-import { cloneQuestionnaireState, createClientId } from '@/lib/client-id';
+import {
+  cloneQuestionnaireState,
+  createClientId,
+  removeBlockById,
+} from '@/lib/client-id';
 
 const COLUMNS = 8;
 const ROWS = 5;
@@ -99,6 +104,7 @@ function nextFreeCell(
 export default function Home() {
   const [motors, setMotors] = useState<MotorBlock[]>([]);
   const [activeMotorId, setActiveMotorId] = useState<string | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [cabinetGeneration, setCabinetGeneration] = useState<Generation>({
     status: 'idle',
@@ -117,6 +123,8 @@ export default function Home() {
   }, [inputVersion]);
   const activeMotor =
     motors.find((motor) => motor.id === activeMotorId) || null;
+  const pendingDelete =
+    motors.find((motor) => motor.id === pendingDeleteId) || null;
   const state = activeMotor?.state || initialQuestionnaireState;
   const groups = useMemo(() => visibleQuestionGroups(state), [state]);
   const diagram = useMemo(() => selectedDiagramRows(state), [state]);
@@ -171,6 +179,15 @@ export default function Home() {
     });
     setActiveMotorId(id);
     setSheetOpen(true);
+  };
+  const deleteMotor = (id: string) => {
+    setMotors((current) => removeBlockById(current, id));
+    if (activeMotorId === id) {
+      setActiveMotorId(null);
+      setSheetOpen(false);
+    }
+    setCabinetGeneration({ status: 'idle' });
+    setPendingDeleteId(null);
   };
   const moveMotor = (id: string, cell: number) =>
     setMotors((current) =>
@@ -433,14 +450,24 @@ export default function Home() {
                       </span>
                       <ArrowUpRight className="ml-auto size-4 text-[#7669dc]" />
                     </button>
-                    <button
-                      onClick={() => copyMotor(motor.id)}
-                      className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-[#f0eeff] px-3 py-2 text-xs font-semibold text-[#6254ca] transition hover:bg-[#e7e3ff]"
-                      title={`Создать независимую копию ${motor.tag}`}
-                    >
-                      <Copy className="size-3.5" />
-                      Копировать блок
-                    </button>
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => copyMotor(motor.id)}
+                        className="flex items-center justify-center gap-2 rounded-xl bg-[#f0eeff] px-3 py-2 text-xs font-semibold text-[#6254ca] transition hover:bg-[#e7e3ff]"
+                        title={`Создать независимую копию ${motor.tag}`}
+                      >
+                        <Copy className="size-3.5" />
+                        Копировать
+                      </button>
+                      <button
+                        onClick={() => setPendingDeleteId(motor.id)}
+                        className="flex items-center justify-center gap-2 rounded-xl bg-[#fff2ef] px-3 py-2 text-xs font-semibold text-[#b44d3d] transition hover:bg-[#ffe7e1]"
+                        title={`Удалить ${motor.tag}`}
+                      >
+                        <Trash2 className="size-3.5" />
+                        Удалить
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -555,6 +582,45 @@ export default function Home() {
             )
           }
         />
+      )}
+      {pendingDelete && (
+        <div className="fixed inset-0 z-[70] grid place-items-center bg-[#1c1c29]/35 p-4 backdrop-blur-sm">
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Удалить блок ${pendingDelete.tag}`}
+            className="w-full max-w-sm rounded-[24px] border border-white bg-[#fbfbfe] p-5 shadow-[0_22px_70px_rgba(28,29,44,.28)] sm:p-6"
+          >
+            <div className="flex items-start gap-3">
+              <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#fff0ec] text-[#b44d3d]">
+                <Trash2 className="size-5" />
+              </span>
+              <div>
+                <p className="text-lg font-semibold tracking-[-.03em] text-[#34323f]">
+                  Удалить {pendingDelete.tag}?
+                </p>
+                <p className="mt-1 text-sm leading-6 text-[#777481]">
+                  Удалятся ответы этого блока и его расчёт в текущей вкладке.
+                  Остальные блоки не изменятся.
+                </p>
+              </div>
+            </div>
+            <div className="mt-6 grid grid-cols-2 gap-3">
+              <button
+                onClick={() => setPendingDeleteId(null)}
+                className="h-11 rounded-xl bg-[#f0f0f5] text-sm font-semibold text-[#62626e] hover:bg-[#e8e8ef]"
+              >
+                Отмена
+              </button>
+              <button
+                onClick={() => deleteMotor(pendingDelete.id)}
+                className="h-11 rounded-xl bg-[#c35543] text-sm font-semibold text-white hover:bg-[#ae4535]"
+              >
+                Удалить блок
+              </button>
+            </div>
+          </section>
+        </div>
       )}
     </main>
   );
