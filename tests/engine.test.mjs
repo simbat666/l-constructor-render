@@ -64,6 +64,29 @@ test('a direct VFD branch input wins over the generic voltage descendant', () =>
   assert.equal(currents[0].nodes[0].inputRule, 'float|0.1..162.0|0.1');
 });
 
+test('new manual VFD branch exposes the dedicated 5.3 voltage and 6.3 current rules', () => {
+  const state = structuredClone(q.initialQuestionnaireState);
+  const select = (question, answer) => {
+    const group = q.visibleQuestionGroups(state).find(item => item.question === question);
+    assert.ok(group, `missing question: ${question}`);
+    const node = group.nodes.find(item => item.answer === answer);
+    assert.ok(node, `missing answer ${answer} for ${question}`);
+    state.selected[group.key] = node.order;
+  };
+  select('Способ пуска / управления двигателем', 'Пуск через ЧП');
+  select('Расположение (ЧП / Симисторный регулятор скорости)', 'Внутри шкафа');
+  select('Способ подбора ЧП', 'Ручной');
+  const voltages = q.visibleQuestionGroups(state)
+    .filter(item => item.question === 'Номинальное напряжение, В');
+  assert.deepEqual(voltages.map(item => item.nodes[0].order), ['5.3']);
+  select('Номинальное напряжение, В', '400 (3L/PE)');
+  const currents = q.visibleQuestionGroups(state)
+    .filter(item => item.question === 'Номинальный ток , А');
+  assert.deepEqual(currents.map(item => item.nodes[0].order), ['6.3']);
+  assert.equal(currents[0].nodes[0].inputRule, 'float|0.1..162.0|0.1');
+  assert.equal(q.engineSelections(state, 'diagram1.').get('voltage'), '400 (3L/PE)');
+});
+
 test('two identical motors retain every occurrence and unique logical addresses', () => {
   const state = complete(true);
   const result = calculateCabinet([{ id: 'one', tag: 'M1', state }, { id: 'two', tag: 'M2', state: structuredClone(state) }]);

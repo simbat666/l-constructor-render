@@ -19,7 +19,7 @@ from openpyxl import load_workbook
 
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_SOURCE = ROOT / "data" / "rules-source" / "ОЛ - Электродвигатель асинхронный_В2 [Z7kKX2].xlsx"
+DEFAULT_SOURCE = ROOT / "data" / "rules-source" / "ОЛ - Электродвигатель асинхронный_В2 [Whxlew].xlsx"
 DEFAULT_TARGET = ROOT / "data" / "motor-v2.json"
 
 
@@ -114,7 +114,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Extract a production rule snapshot from a motor OL workbook")
     parser.add_argument("--source", type=Path, default=DEFAULT_SOURCE, help="Source .xlsx workbook")
     parser.add_argument("--target", type=Path, default=DEFAULT_TARGET, help="Target JSON rule snapshot")
-    parser.add_argument("--revision", default="В2 Z7kKX2 · supplied OL with semantic bindings", help="Human-readable source revision stored in JSON")
+    parser.add_argument("--revision", default="В2 Whxlew · supplied OL", help="Human-readable source revision stored in JSON")
     return parser.parse_args()
 
 
