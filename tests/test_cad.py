@@ -20,6 +20,38 @@ api = module('local_cad_api')
 assembler = module('assemble_dxf_package')
 
 class CadTests(unittest.TestCase):
+    def test_device_designations_are_scoped_to_the_full_cabinet(self):
+        selected = assembler.load_selected(assembler.DEFAULT_LIBRARY, assembler.DEFAULT_DXF_SOURCES, ['im1-011', 'im1-011'])
+        with tempfile.TemporaryDirectory(prefix='l-designations-test-') as directory:
+            output = Path(directory) / 'result.dxf'
+            assembler.assemble(assembler.split_pages(assembler.load_and_validate(selected)), output)
+            document = ezdxf.readfile(output)
+            fields = assembler.designation_fields(document.modelspace(), assembler.load_field_contract())
+            actual = {(item['prefix'], assembler.mtext_plain(item['placeholder'])) for item in fields}
+            self.assertTrue({
+                ('QF', '#1'), ('QF', '#1.1'), ('QF', '#2'), ('QF', '#2.1'),
+                ('KM', '#1'), ('KM', '#1.1'), ('KM', '#2'), ('KM', '#2.1'),
+            }.issubset(actual))
+            all_markers = {
+                (assembler.source_layer_name(entity.dxf.layer), assembler.mtext_plain(entity))
+                for entity in document.modelspace()
+                if entity.dxftype() == 'MTEXT' and assembler.PLACEHOLDER.fullmatch(assembler.mtext_plain(entity))
+            }
+            self.assertIn(('XT1', '#1'), all_markers)
+            self.assertIn(('XT7', '#2'), all_markers)
+            self.assertIn(('Headers', '#1'), all_markers)
+
+    def test_device_renumbering_trace_keeps_source_layer_and_handle(self):
+        selected = assembler.load_selected(assembler.DEFAULT_LIBRARY, assembler.DEFAULT_DXF_SOURCES, ['im1-054', 'im1-054'])
+        with tempfile.TemporaryDirectory(prefix='l-designation-trace-test-') as directory:
+            trace = []
+            assembler.assemble(assembler.split_pages(assembler.load_and_validate(selected)), Path(directory) / 'result.dxf', parameter_trace=trace, drawing_kind='electrical')
+        self.assertTrue(trace)
+        self.assertEqual({item['layer'] for item in trace}, {'QF', 'KL'})
+        self.assertTrue(all(item['placeholderHandle'] for item in trace))
+        self.assertTrue(all(item['drawingKind'] == 'electrical' for item in trace))
+        self.assertIn(('#1', '#2'), {(item['before'], item['after']) for item in trace})
+
     def test_wrong_document_kind_rejected(self):
         with self.assertRaises(ValueError):
             api.validate_instances({'instances': [{'id': 'motor', 'code': 'im1-011', 'drawingKind': 'external'}]})
