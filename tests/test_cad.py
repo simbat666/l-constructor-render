@@ -66,6 +66,12 @@ class CadTests(unittest.TestCase):
             assembler.build_bundle(instances, output, manifest)
             with zipfile.ZipFile(output) as archive:
                 self.assertEqual(set(archive.namelist()), {'result-electrical.dxf', 'result-external.dxf', 'manifest.json'})
+                exported_manifest = json.loads(archive.read('manifest.json'))
+                parameterization = exported_manifest['cadParameterization']
+                self.assertEqual(parameterization['contractVersion'], 1)
+                self.assertTrue(parameterization['fields'])
+                self.assertTrue(all(item['layer'] in {'QF', 'KM', 'KL'} for item in parameterization['fields']))
+                self.assertTrue(all(item['placeholderHandle'] for item in parameterization['fields']))
             for kind, forbidden in [('electrical', 'im2-1'), ('external', 'im1-011')]:
                 document = ezdxf.readfile(root / f'result-{kind}.dxf')
                 self.assertFalse(document.audit().has_errors)
