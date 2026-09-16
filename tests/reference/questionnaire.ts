@@ -1,3 +1,4 @@
+// Frozen pre-Python migration oracle. Never import into app/runtime.
 import ruleBase from '@/data/motor-v2.json';
 import bindings from '@/data/motor-field-bindings.json';
 

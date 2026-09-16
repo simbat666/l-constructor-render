@@ -5,8 +5,10 @@ import unittest
 import json
 import zipfile
 import ezdxf
+import sys
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / 'scripts'))
 
 def module(name):
     spec = importlib.util.spec_from_file_location(name, ROOT / 'scripts' / f'{name}.py')

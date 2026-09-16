@@ -3,7 +3,7 @@ const upstream = process.env.L_DXF_INTERNAL_URL || 'http://127.0.0.1:3001';
 async function forward(request: Request) {
   const path = new URL(request.url).pathname.replace(/^\/api\/cad/, '');
   const allowed =
-    (request.method === 'POST' && path === '/generate') ||
+    (request.method === 'POST' && ['/generate', '/calculate'].includes(path)) ||
     (['GET', 'HEAD'].includes(request.method) &&
       (path === '/healthz' ||
         /^\/files\/cabinet-[a-f0-9]{32}(?:-(?:electrical|external))?\.(dxf|json|zip)$/.test(
@@ -25,7 +25,7 @@ async function forward(request: Request) {
       method: request.method,
       body,
       headers: { 'Content-Type': 'application/json' },
-      signal: AbortSignal.timeout(100_000),
+      signal: AbortSignal.timeout(path === '/calculate' ? 15_000 : 100_000),
     });
     const headers = new Headers({
       'Cache-Control': 'no-store',
@@ -47,7 +47,7 @@ async function forward(request: Request) {
     return Response.json(
       {
         error:
-          'DXF-сервис недоступен. Запусти npm run cad в отдельном терминале.',
+          'Сервис расчёта недоступен. Попробуй повторить запрос.',
       },
       { status: 503 },
     );

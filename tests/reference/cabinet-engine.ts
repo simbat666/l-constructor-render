@@ -1,3 +1,4 @@
+// Frozen pre-Python migration oracle. Never import into app/runtime.
 import base from '@/data/motor-v2.json';
 import bindings from '@/data/motor-field-bindings.json';
 import {
@@ -7,12 +8,12 @@ import {
   selectedOptionalDiagramRows,
   questionnaireFingerprint,
   type QuestionnaireState,
-} from '@/lib/questionnaire';
+} from './questionnaire';
 import {
   allocateControllerIo,
   type IoCounts,
   type Channel,
-} from '@/lib/io-allocator';
+} from './io-allocator';
 
 export type SchemeRow = {
   sourceRow: number;
@@ -337,7 +338,8 @@ export function calculateCabinet(motors: MotorInstance[]) {
         if (matches.length === 1) {
           vfd = matches[0];
           vfdSource = 'sp2';
-        } else
+        }
+        else
           block.warnings.push(
             matches.length
               ? `Подбор ЧП из sp2 неоднозначен: строки ${matches.map((row) => row.sourceRow).join(', ')}.`

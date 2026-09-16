@@ -1,3 +1,4 @@
+// Frozen pre-Python migration oracle. Never import into app/runtime.
 /**
  * Select compatible electrical-scheme variants for every functional block and
  * reserve controller channels.  The OL provides variants (DI 0/24 V and

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   ArrowUpRight,
   CircleCheck,
@@ -19,15 +19,10 @@ import { Input } from '@/components/ui/input';
 import {
   initialQuestionnaireState,
   numericInputRule,
-  questionnaireRevision,
-  question4Placeholder,
-  pruneQuestionnaireState,
-  selectedDiagramRows,
-  visibleQuestionGroups,
+  useEngineering,
   type QuestionnaireState,
   type VisibleGroup,
-} from '@/lib/questionnaire';
-import { calculateCabinet } from '@/lib/cabinet-engine';
+} from '@/lib/engineering-client';
 import {
   cloneQuestionnaireState,
   createClientId,
@@ -109,7 +104,13 @@ export default function Home() {
   const [cabinetGeneration, setCabinetGeneration] = useState<Generation>({
     status: 'idle',
   });
-  const cabinet = useMemo(() => calculateCabinet(motors), [motors]);
+  const engineering = useEngineering(motors, (normalized) => {
+    setMotors(current => current.map(motor => {
+      const accepted = normalized.find(item => item.id === motor.id);
+      return accepted ? {...motor, state: accepted.state} : motor;
+    }));
+  });
+  const {cabinet, revision: questionnaireRevision} = engineering;
   const inputVersion = JSON.stringify(
     motors.map(({ id, tag, state }) => ({ id, tag, state })),
   );
@@ -126,8 +127,7 @@ export default function Home() {
   const pendingDelete =
     motors.find((motor) => motor.id === pendingDeleteId) || null;
   const state = activeMotor?.state || initialQuestionnaireState;
-  const groups = useMemo(() => visibleQuestionGroups(state), [state]);
-  const diagram = useMemo(() => selectedDiagramRows(state), [state]);
+  const groups = activeMotorId ? engineering.forms[activeMotorId] || [] : [];
   const calculatedMotor = cabinet.blocks.find(
     (item) => item.id === activeMotorId,
   );
@@ -208,10 +208,10 @@ export default function Home() {
         motor.id === activeMotorId
           ? {
               ...motor,
-              state: pruneQuestionnaireState({
+              state: {
                 ...motor.state,
                 [part]: { ...motor.state[part], [key]: value },
-              }),
+              },
               generation: { status: 'idle' },
             }
           : motor,
@@ -219,7 +219,7 @@ export default function Home() {
     );
   };
   const generateDxf = async () => {
-    if (!schemeCodes.length || !activeMotorId) return;
+    if (!engineering.ready || !cabinet.canExport || !schemeCodes.length || !activeMotorId) return;
     const version = inputVersion;
     setMotors((current) =>
       current.map((motor) =>
@@ -233,7 +233,8 @@ export default function Home() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          instances: activeInstances,
+          motors: JSON.parse(inputVersion),
+          blockId: activeMotorId,
           ruleFingerprint: cabinet.ruleFingerprint,
         }),
       });
@@ -291,7 +292,7 @@ export default function Home() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          instances: cabinet.instances,
+          motors: JSON.parse(inputVersion),
           ruleFingerprint: cabinet.ruleFingerprint,
         }),
       });
@@ -461,8 +462,8 @@ export default function Home() {
                       </button>
                       <button
                         onClick={() => setPendingDeleteId(motor.id)}
-                        className="flex items-center justify-center gap-2 rounded-xl bg-[#fff2ef] px-3 py-2 text-xs font-semibold text-[#b44d3d] transition hover:bg-[#ffe7e1]"
-                        title={`Удалить ${motor.tag}`}
+                        className="flex items-center justify-center gap-2 rounded-xl bg-[#fff1ee] px-3 py-2 text-xs font-semibold text-[#b45b45] transition hover:bg-[#ffe5de]"
+                        title={`Удалить ${motor.tag} из состава шкафа`}
                       >
                         <Trash2 className="size-3.5" />
                         Удалить
@@ -478,6 +479,9 @@ export default function Home() {
             </div>
             <div className="mt-5 space-y-3 border-t border-[#e4e4ed] pt-5">
               <h3 className="text-sm font-semibold">Схемы всего шкафа</h3>
+              {!engineering.ready && <p role="status" className="text-xs text-[#7669dc]">
+                {engineering.error ? <>{engineering.error} <button className="underline" onClick={engineering.retry}>Повторить</button></> : 'Пересчитываю…'}
+              </p>}
               <p className="text-xs leading-5 text-[#777786]">
                 Два отдельных документа по всем блокам поля: принципиальная
                 электрическая схема и схема внешних соединений. У каждого своя
@@ -522,7 +526,7 @@ export default function Home() {
                 variant="outline"
                 className="w-full"
                 onClick={downloadCalculation}
-                disabled={!motors.length}
+                disabled={!motors.length || !engineering.ready}
               >
                 <Download className="size-4" />
                 Скачать расчёт JSON
@@ -537,6 +541,11 @@ export default function Home() {
       </div>
       {sheetOpen && activeMotor && (
         <QuestionnaireSheet
+          revision={questionnaireRevision}
+          calculationPending={!engineering.ready}
+          canExport={cabinet.canExport}
+          calculationError={engineering.error}
+          onRetry={engineering.retry}
           motorTag={activeMotor.tag}
           groups={groups}
           state={state}
@@ -549,11 +558,11 @@ export default function Home() {
               ),
             )
           }
-          diagramRows={diagram.rows}
+          diagramRows={calculatedMotor?.main ? [calculatedMotor.main] : []}
           selectedMain={calculatedMotor?.main}
           channels={calculatedMotor?.channels || []}
           optionalRows={optionalDiagram}
-          missing={calculatedMotor?.errors || diagram.missing}
+          missing={calculatedMotor?.errors || []}
           schemeCodes={schemeCodes}
           generation={activeMotor.generation}
           onGenerate={generateDxf}
@@ -589,35 +598,36 @@ export default function Home() {
             role="dialog"
             aria-modal="true"
             aria-label={`Удалить блок ${pendingDelete.tag}`}
-            className="w-full max-w-sm rounded-[24px] border border-white bg-[#fbfbfe] p-5 shadow-[0_22px_70px_rgba(28,29,44,.28)] sm:p-6"
+            className="w-full max-w-sm rounded-[24px] bg-white p-6 shadow-[0_22px_70px_rgba(28,29,44,.28)]"
           >
             <div className="flex items-start gap-3">
-              <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#fff0ec] text-[#b44d3d]">
+              <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#fff1ee] text-[#b45b45]">
                 <Trash2 className="size-5" />
               </span>
               <div>
-                <p className="text-lg font-semibold tracking-[-.03em] text-[#34323f]">
+                <h3 className="text-lg font-semibold text-[#393744]">
                   Удалить {pendingDelete.tag}?
-                </p>
-                <p className="mt-1 text-sm leading-6 text-[#777481]">
+                </h3>
+                <p className="mt-1 text-xs leading-5 text-[#777481]">
                   Удалятся ответы этого блока и его расчёт в текущей вкладке.
                   Остальные блоки не изменятся.
                 </p>
               </div>
             </div>
             <div className="mt-6 grid grid-cols-2 gap-3">
-              <button
+              <Button
+                variant="outline"
                 onClick={() => setPendingDeleteId(null)}
-                className="h-11 rounded-xl bg-[#f0f0f5] text-sm font-semibold text-[#62626e] hover:bg-[#e8e8ef]"
+                className="border-[#e3e2ea] bg-white"
               >
                 Отмена
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={() => deleteMotor(pendingDelete.id)}
-                className="h-11 rounded-xl bg-[#c35543] text-sm font-semibold text-white hover:bg-[#ae4535]"
+                className="bg-[#c96a51] text-white hover:bg-[#b75d46]"
               >
                 Удалить блок
-              </button>
+              </Button>
             </div>
           </section>
         </div>
@@ -759,6 +769,11 @@ function Board({
 }
 
 function QuestionnaireSheet({
+  canExport,
+  revision,
+  calculationPending,
+  calculationError,
+  onRetry,
   motorTag,
   groups,
   state,
@@ -777,6 +792,11 @@ function QuestionnaireSheet({
   onReset,
   calculationSummary,
 }: {
+  canExport: boolean;
+  revision: string;
+  calculationPending: boolean;
+  calculationError: string;
+  onRetry: () => void;
   motorTag: string;
   groups: VisibleGroup[];
   state: QuestionnaireState;
@@ -812,7 +832,7 @@ function QuestionnaireSheet({
             <div>
               <p className="text-sm font-semibold">Двигатель {motorTag}</p>
               <p className="text-xs text-[#7d7d88]">
-                Опросный лист · {questionnaireRevision}
+                Опросный лист · {revision}
               </p>
             </div>
           </div>
@@ -835,6 +855,9 @@ function QuestionnaireSheet({
             </button>
           </div>
         </header>
+        <div role="status" className="px-5 py-2 text-xs text-[#7669dc]">
+          {calculationError ? <>{calculationError} <button onClick={onRetry} className="underline">Повторить</button></> : calculationPending ? 'Пересчитываю…' : 'Расчёт обновлён'}
+        </div>
         <div className="grid flex-1 overflow-y-auto lg:grid-cols-[1.05fr_.95fr]">
           <section className="p-5 sm:p-8">
             <p className="text-xs font-semibold uppercase tracking-[.16em] text-[#7669dc]">
@@ -870,6 +893,7 @@ function QuestionnaireSheet({
             <div className="mt-8 flex gap-3">
               <Button
                 onClick={() => setRequested(true)}
+                disabled={calculationPending}
                 className="l-block-gradient h-11 flex-1 text-white shadow-[0_8px_18px_rgba(119,103,255,.25)] hover:opacity-90"
               >
                 Проверить схемы
@@ -882,7 +906,6 @@ function QuestionnaireSheet({
                 Сбросить
               </Button>
             </div>
-            <Placeholder />
           </section>
           <section className="border-t border-[#ececf2] bg-[#f6f6fa] p-5 sm:p-8 lg:border-l lg:border-t-0">
             <p className="text-xs font-semibold uppercase tracking-[.16em] text-[#7669dc]">
@@ -892,12 +915,13 @@ function QuestionnaireSheet({
               Результат выбора
             </h2>
             <DiagramResult
+              canExport={canExport}
               rows={diagramRows}
               selectedMain={selectedMain}
               channels={channels}
               optionalRows={optionalRows}
               missing={missing}
-              requested={requested}
+              requested={requested && !calculationPending}
               schemeCodes={schemeCodes}
               generation={generation}
               onGenerate={onGenerate}
@@ -1084,6 +1108,7 @@ function QuestionControl({
 }
 
 function DiagramResult({
+  canExport,
   rows,
   selectedMain,
   channels,
@@ -1094,6 +1119,7 @@ function DiagramResult({
   generation,
   onGenerate,
 }: {
+  canExport: boolean;
   rows: DiagramRow[];
   selectedMain?: DiagramRow;
   channels: Array<{ family: string; address: string }>;
@@ -1176,7 +1202,7 @@ function DiagramResult({
             </div>
           </div>
           <Button
-            disabled={generation.status === 'working'}
+            disabled={!canExport || generation.status === 'working'}
             onClick={onGenerate}
             className="l-block-gradient mt-4 h-11 w-full text-white shadow-[0_8px_18px_rgba(119,103,255,.25)] hover:opacity-90"
           >
@@ -1192,6 +1218,7 @@ function DiagramResult({
               </>
             )}
           </Button>
+          {!canExport && <p className="mt-2 text-xs text-[#9a5635]">Для согласованного I/O сначала заполни остальные блоки шкафа.</p>}
           {generation.status === 'success' && (
             <div className="mt-3 rounded-xl bg-[#effbf6] p-3 text-xs leading-5 text-[#39715a]">
               <div className="flex items-center gap-2">
@@ -1403,15 +1430,6 @@ function Notice({ children }: { children: ReactNode }) {
   return (
     <div className="rounded-2xl border border-[#ffcfaf] bg-[#fff8f2] p-4 text-sm text-[#9a5f35]">
       {children}
-    </div>
-  );
-}
-function Placeholder() {
-  const node = question4Placeholder();
-  return (
-    <div className="mt-7 rounded-xl bg-[#f5f5f9] p-4 text-xs leading-5 text-[#83838e]">
-      <span className="font-mono text-[#64646f]">Ques 4 / {node?.order}</span>{' '}
-      пустой в исходной ОЛ: поле не генерируется.
     </div>
   );
 }

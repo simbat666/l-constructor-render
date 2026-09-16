@@ -1,13 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { createJiti } from 'jiti';
 import { fileURLToPath } from 'node:url';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const jiti = createJiti(import.meta.url, { alias: { '@': root } });
-const q = await jiti.import('../lib/questionnaire.ts');
-const { calculateCabinet } = await jiti.import('../lib/cabinet-engine.ts');
-const { allocateControllerIo } = await jiti.import('../lib/io-allocator.ts');
-const { createClientId, cloneQuestionnaireState, removeBlockById } = await jiti.import('../lib/client-id.ts');
+const q = await jiti.import('./reference/questionnaire.ts');
+const { calculateCabinet } = await jiti.import('./reference/cabinet-engine.ts');
+const { allocateControllerIo } = await jiti.import('./reference/io-allocator.ts');
+const {
+  createClientId,
+  cloneQuestionnaireState,
+  removeBlockById,
+} = await jiti.import('../lib/client-id.ts');
 
 function complete(withSensors = false) {
   const state = structuredClone(q.initialQuestionnaireState);
@@ -277,4 +282,44 @@ test('block id generation works on HTTP where crypto.randomUUID is unavailable',
   assert.match(first, /^local-[a-z0-9]+-[a-z0-9]+$/);
   assert.notEqual(first, second);
   assert.equal(createClientId(() => 'native-id'), 'native-id');
+});
+
+test('Python migration matches frozen TypeScript results including graph and boundary cases', () => {
+  const states = [q.initialQuestionnaireState, complete(), complete(true), completeVfd('Ручной'), completeVfd('Автоматический')];
+  for (const template of [...states].slice(1)) {
+    for (const current of ['0', '0.1', '3.2', '4', '6.4', '56.6', '162', '162.1', 'invalid']) {
+      const state = structuredClone(template);
+      for (const answer of q.activeAnswers(state)) {
+        if (q.semanticKey(answer) === 'motor.ratedCurrent') state.inputs[`${answer.sheet}:${answer.order}`] = current;
+      }
+      states.push(state);
+    }
+  }
+  // Walk many graph paths, including external VFD, triac and starter variants.
+  for (let seed = 0; seed < 80; seed++) {
+    const state = structuredClone(q.initialQuestionnaireState);
+    for (let pass = 0; pass < 18; pass++) {
+      for (const group of q.visibleQuestionGroups(state)) {
+        const node = group.nodes[0];
+        const key = `${node.sheet}:${node.order}`;
+        if (['list', 'radio_group'].includes(group.fieldType)) {
+          state.selected[group.key] ||= group.nodes[(seed + group.question.length) % group.nodes.length].order;
+        } else if (group.fieldType === 'input') {
+          state.inputs[key] = q.numericInputRule(node.inputRule) ? String(q.numericInputRule(node.inputRule).min) : 'M1';
+        } else if (group.fieldType === 'check_box') state.checks[key] = seed % 2 === 0;
+      }
+    }
+    states.push(state);
+  }
+  const projects = [[], ...states.map(state => [{ id: 'one', tag: 'M1', state }]),
+    [{ id: 'one', tag: 'M1', state: complete(true) }, { id: 'two', tag: 'M2', state: complete(true) }],
+    [{ id: 'one', tag: 'M1', state: complete() }, { id: 'two', tag: 'M2', state: q.initialQuestionnaireState }]];
+  const script = `import sys,json\nsys.path.insert(0,'scripts')\nfrom cabinet_engine import calculate_cabinet\nfrom questionnaire import visible_groups,prune_state\nprojects=json.load(sys.stdin)\njson.dump([dict(calculation=calculate_cabinet(p),groups=[visible_groups(m['state']) for m in p],pruned=[prune_state(m['state']) for m in p]) for p in projects],sys.stdout,ensure_ascii=False,allow_nan=False)`;
+  const child = spawnSync('python3', ['-c', script], { cwd: root, input: JSON.stringify(projects), encoding: 'utf8', maxBuffer: 40 * 1024 * 1024 });
+  assert.equal(child.status, 0, child.stderr);
+  const actual = JSON.parse(child.stdout);
+  for (let i = 0; i < projects.length; i++) {
+    const expected = JSON.parse(JSON.stringify({calculation: calculateCabinet(projects[i]), groups: projects[i].map(m => q.visibleQuestionGroups(m.state)), pruned: projects[i].map(m => q.pruneQuestionnaireState(m.state))}));
+    assert.deepEqual(actual[i], expected, `migration scenario ${i}`);
+  }
 });

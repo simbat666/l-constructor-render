@@ -20,6 +20,8 @@ import sys
 import uuid
 from threading import BoundedSemaphore
 from urllib.parse import unquote, urlparse
+from cabinet_engine import evaluate_project, RevisionConflict
+from questionnaire import BASE
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -67,6 +69,7 @@ def json_response(handler: BaseHTTPRequestHandler, status: int, body: dict[str, 
     handler.send_response(status)
     handler.send_header("Content-Type", "application/json; charset=utf-8")
     handler.send_header("Content-Length", str(len(payload)))
+    handler.send_header("Cache-Control", "no-store")
     cors_headers(handler)
     handler.end_headers()
     if handler.command != "HEAD":
@@ -119,7 +122,8 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_POST(self) -> None:
-        if urlparse(self.path).path != "/generate":
+        path = urlparse(self.path).path
+        if path not in ('/generate', '/calculate'):
             json_response(self, HTTPStatus.NOT_FOUND, {"error": "Unknown endpoint"})
             return
         try:
@@ -127,13 +131,27 @@ class Handler(BaseHTTPRequestHandler):
             if length <= 0 or length > MAX_BODY:
                 raise ValueError("Invalid request size")
             payload = json.loads(self.rfile.read(length).decode("utf-8"))
-            instances = validate_instances(payload)
+            if not isinstance(payload, dict):
+                raise ValueError('Нужен объект проекта')
+            if path == '/generate' and payload.get('ruleFingerprint') != BASE['source']['sha256']:
+                raise RevisionConflict('Перед экспортом пересчитай проект по текущей базе ОЛ.')
+            evaluated = evaluate_project(payload)
+            if path == '/calculate':
+                json_response(self, HTTPStatus.OK, evaluated)
+                return
+            calculation = evaluated['calculation']
+            if not calculation['canExport']:
+                raise ValueError('Нельзя собрать незавершённый шкаф: ' + '; '.join(calculation['errors']))
+            block_id = payload.get('blockId')
+            if block_id is not None and block_id not in {b['id'] for b in calculation['blocks']}:
+                raise ValueError('Неизвестный блок для экспорта')
+            instances = validate_instances({'instances': [i for i in calculation['instances'] if block_id is None or i['blockId'] == block_id]})
             normalized = [item["code"] for item in instances]
             filename = f"cabinet-{uuid.uuid4().hex}.zip"
             OUTPUT.mkdir(parents=True, exist_ok=True)
             target = OUTPUT / filename
             manifest = target.with_suffix(".json")
-            manifest.write_text(json.dumps({"schemaVersion": 2, "status": "draft", "instances": instances, "ruleFingerprint": payload.get("ruleFingerprint"), "notice": "Separate electrical and external drawing sets. Template composition, not released electrical documentation."}, ensure_ascii=False, indent=2), encoding="utf-8")
+            manifest.write_text(json.dumps({"schemaVersion": 2, "status": "draft", "instances": instances, "ruleFingerprint": calculation['ruleFingerprint'], "project": evaluated['calculation']['blocks'], "notice": "Server-calculated electrical and external drawing sets. Template composition, not released electrical documentation."}, ensure_ascii=False, indent=2), encoding="utf-8")
             if not GENERATION_SLOTS.acquire(blocking=False):
                 json_response(self, HTTPStatus.SERVICE_UNAVAILABLE, {"error": "Генератор занят. Повтори запрос через несколько секунд."})
                 return
@@ -164,6 +182,8 @@ class Handler(BaseHTTPRequestHandler):
                     "message": result.stdout.strip(),
                 },
             )
+        except RevisionConflict as error:
+            json_response(self, HTTPStatus.CONFLICT, {"error": str(error)})
         except (ValueError, RuntimeError, subprocess.TimeoutExpired) as error:
             json_response(self, HTTPStatus.UNPROCESSABLE_ENTITY, {"error": str(error)})
         except Exception:
