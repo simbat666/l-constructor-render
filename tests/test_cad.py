@@ -26,11 +26,15 @@ class CadTests(unittest.TestCase):
             output = Path(directory) / 'result.dxf'
             assembler.assemble(assembler.split_pages(assembler.load_and_validate(selected)), output)
             document = ezdxf.readfile(output)
-            fields = assembler.designation_fields(document.modelspace(), assembler.load_field_contract())
-            actual = {(item['prefix'], assembler.mtext_plain(item['placeholder'])) for item in fields}
+            actual = {
+                (assembler.source_layer_name(entity.dxf.layer), assembler.mtext_plain(entity))
+                for entity in document.modelspace()
+                if entity.dxftype() == 'MTEXT'
+                and assembler.source_layer_name(entity.dxf.layer) in {'QF', 'KM'}
+            }
             self.assertTrue({
-                ('QF', '#1'), ('QF', '#1.1'), ('QF', '#2'), ('QF', '#2.1'),
-                ('KM', '#1'), ('KM', '#1.1'), ('KM', '#2'), ('KM', '#2.1'),
+                ('QF', '1'), ('QF', '1.1'), ('QF', '2'), ('QF', '2.1'),
+                ('KM', '1'), ('KM', '1.1'), ('KM', '2'), ('KM', '2.1'),
             }.issubset(actual))
             all_markers = {
                 (assembler.source_layer_name(entity.dxf.layer), assembler.mtext_plain(entity))
@@ -50,7 +54,7 @@ class CadTests(unittest.TestCase):
         self.assertEqual({item['layer'] for item in trace}, {'QF', 'KL'})
         self.assertTrue(all(item['placeholderHandle'] for item in trace))
         self.assertTrue(all(item['drawingKind'] == 'electrical' for item in trace))
-        self.assertIn(('#1', '#2'), {(item['before'], item['after']) for item in trace})
+        self.assertIn(('#1', '2'), {(item['before'], item['after']) for item in trace})
 
     def test_wrong_document_kind_rejected(self):
         with self.assertRaises(ValueError):

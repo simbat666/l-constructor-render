@@ -123,7 +123,9 @@ def renumber_designations(modelspace, counters, contract):
     for field in fields:
         new_number = numbers[field['prefix']][field['root']]
         before = mtext_plain(field['placeholder'])
-        after = f'#{new_number}{field["suffix"]}'
+        # ``#`` is a source-template marker, not part of the published
+        # designation: ``#1.1`` becomes the readable ``1.1``.
+        after = f'{new_number}{field["suffix"]}'
         # ``before`` was verified against PLACEHOLDER above, so this changes
         # exactly its visible marker and preserves MTEXT alignment controls.
         field['placeholder'].text = field['placeholder'].text.replace(before, after)
