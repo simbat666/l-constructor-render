@@ -39,7 +39,12 @@ async function forward(request: Request) {
       const value = result.headers.get(name);
       if (value) headers.set(name, value);
     }
-    return new Response(request.method === 'HEAD' ? null : result.body, {
+    // Drain calculation JSON before returning it. Streaming an HTTP/1.0
+    // upstream into a slower client can trigger Node's Undici paused-parser
+    // assertion when the Python connection closes (large cabinets).
+    const responseBody = request.method === 'HEAD' ? null
+      : path === '/calculate' ? await result.arrayBuffer() : result.body;
+    return new Response(responseBody, {
       status: result.status,
       headers,
     });

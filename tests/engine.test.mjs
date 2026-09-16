@@ -8,6 +8,25 @@ const jiti = createJiti(import.meta.url, { alias: { '@': root } });
 const q = await jiti.import('./reference/questionnaire.ts');
 const { calculateCabinet } = await jiti.import('./reference/cabinet-engine.ts');
 const { allocateControllerIo } = await jiti.import('./reference/io-allocator.ts');
+const { POST: proxyPost } = await jiti.import('../app/api/cad/[...path]/route.ts');
+
+test('calculation proxy drains large upstream JSON before returning to a slow client', async () => {
+  const originalFetch = globalThis.fetch;
+  const bytes = new TextEncoder().encode(JSON.stringify({ text: 'Тест'.repeat(150000) }));
+  let closed = false;
+  globalThis.fetch = async () => new Response(new ReadableStream({
+    start(controller) {
+      controller.enqueue(bytes.subarray(0, 300000));
+      setTimeout(() => { controller.enqueue(bytes.subarray(300000)); closed = true; controller.close(); }, 10);
+    },
+  }), { headers: { 'Content-Type': 'application/json', 'Content-Length': String(bytes.length) } });
+  try {
+    const response = await proxyPost(new Request('http://localhost/api/cad/calculate', { method: 'POST', body: '{"motors":[]}' }));
+    assert.equal(closed, true);
+    assert.equal(response.status, 200);
+    assert.equal((await response.arrayBuffer()).byteLength, bytes.length);
+  } finally { globalThis.fetch = originalFetch; }
+});
 const {
   createClientId,
   cloneQuestionnaireState,
