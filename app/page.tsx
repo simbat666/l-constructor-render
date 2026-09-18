@@ -1,15 +1,18 @@
 'use client';
 
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import {
+  ArrowLeft,
   ArrowUpRight,
   CircleCheck,
   Copy,
   Download,
   FileCog,
+  FolderKanban,
   GripVertical,
   Layers3,
   LoaderCircle,
+  LogOut,
   Plus,
   Trash2,
   TriangleAlert,
@@ -28,6 +31,17 @@ import {
   createClientId,
   removeBlockById,
 } from '@/lib/client-id';
+import {
+  addWorkspace,
+  loadLocalCatalog,
+  loadLocalWorkspace,
+  newProject,
+  saveLocalCatalog,
+  saveLocalWorkspace,
+  type LocalProject,
+  type LocalWorkspace,
+  type StoredMotor,
+} from '@/lib/project-storage';
 
 const COLUMNS = 8;
 const ROWS = 5;
@@ -96,9 +110,121 @@ function nextFreeCell(
   return null;
 }
 
+function LoadingScreen() {
+  return <main className="l-rainbow grid min-h-screen place-items-center p-6 text-sm text-[#747480]">Проверяем доступ…</main>;
+}
+
+function LoginScreen({ onLogin }: { onLogin: (user: string) => void }) {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [working, setWorking] = useState(false);
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setWorking(true);
+    setError('');
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+      const result = await response.json() as { user?: string; error?: string };
+      if (!response.ok || !result.user) throw new Error(result.error || 'Не удалось войти.');
+      onLogin(result.user);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Не удалось войти.');
+    } finally {
+      setWorking(false);
+    }
+  };
+  return <main className="l-rainbow grid min-h-screen place-items-center p-5">
+    <form onSubmit={submit} className="w-full max-w-sm rounded-[28px] border border-white bg-white/85 p-7 shadow-[0_20px_60px_rgba(28,29,44,.14)] backdrop-blur">
+      <div className="l-block-gradient grid size-11 place-items-center rounded-2xl text-lg font-black text-white">L</div>
+      <h1 className="mt-5 text-2xl font-semibold tracking-[-.04em]">L Constructor</h1>
+      <p className="mt-2 text-sm leading-6 text-[#747480]">Вход в закрытый инженерный стенд.</p>
+      <label className="mt-6 block text-xs font-semibold text-[#555563]">Логин
+        <Input className="mt-2" autoComplete="username" value={username} onChange={(event) => setUsername(event.target.value)} required />
+      </label>
+      <label className="mt-4 block text-xs font-semibold text-[#555563]">Пароль
+        <Input className="mt-2" type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required />
+      </label>
+      {error && <p className="mt-4 text-sm text-[#c83c58]">{error}</p>}
+      <Button className="mt-6 w-full" type="submit" disabled={working}>{working ? 'Входим…' : 'Войти'}</Button>
+    </form>
+  </main>;
+}
+
+type Session = { enabled: boolean; user: string | null };
+type ProjectScreen =
+  | { kind: 'projects' }
+  | { kind: 'workspaces'; projectId: string }
+  | { kind: 'cabinet'; projectId: string; workspaceId: string };
+
 export default function Home() {
-  const [motors, setMotors] = useState<MotorBlock[]>([]);
-  const [activeMotorId, setActiveMotorId] = useState<string | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  useEffect(() => {
+    let active = true;
+    void fetch('/api/auth/session', { cache: 'no-store' })
+      .then(async (response) => response.ok ? response.json() as Promise<Session> : { enabled: true, user: null })
+      .then((value) => active && setSession(value))
+      .catch(() => active && setSession({ enabled: true, user: null }));
+    return () => { active = false; };
+  }, []);
+  if (!session) return <LoadingScreen />;
+  if (session.enabled && !session.user) return <LoginScreen onLogin={(user) => setSession({ enabled: true, user })} />;
+  return <ProjectHome user={session.user} onLogout={() => setSession({ enabled: true, user: null })} />;
+}
+
+function ProjectHome({ user, onLogout }: { user: string | null; onLogout: () => void }) {
+  const [catalog, setCatalog] = useState(() => loadLocalCatalog(user));
+  const [screen, setScreen] = useState<ProjectScreen>({ kind: 'projects' });
+  const [projectName, setProjectName] = useState('');
+  const [workspaceName, setWorkspaceName] = useState('');
+  const project = screen.kind === 'projects' ? null : catalog.projects.find((item) => item.id === screen.projectId) || null;
+  const createProject = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const created = newProject(projectName);
+    const next = { projects: [...catalog.projects, created] };
+    saveLocalCatalog(user, next);
+    setCatalog(next); setProjectName(''); setScreen({ kind: 'workspaces', projectId: created.id });
+  };
+  const createWorkspace = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!project) return;
+    const next = addWorkspace(catalog, project.id, workspaceName);
+    saveLocalCatalog(user, next); setCatalog(next); setWorkspaceName('');
+  };
+  const logout = async () => { await fetch('/api/auth/logout', { method: 'POST' }); onLogout(); };
+  if (screen.kind === 'cabinet') {
+    const workspace = project?.workspaces.find((item) => item.id === screen.workspaceId);
+    if (project && workspace) return <CabinetApp user={user} project={project} workspace={workspace} onBack={() => setScreen({ kind: 'workspaces', projectId: project.id })} onLogout={logout} />;
+  }
+  return <main className="l-rainbow min-h-screen text-[#171720]">
+    <header className="mx-auto flex max-w-5xl items-center justify-between px-5 py-5 sm:px-8">
+      <div className="flex items-center gap-3"><span className="l-block-gradient grid size-10 place-items-center rounded-2xl text-sm font-black text-white shadow-lg">L</span><div><h1 className="text-sm font-bold tracking-[-.02em]">L Constructor</h1><p className="text-xs text-[#747480]">личный кабинет</p></div></div>
+      {user && <button type="button" className="rounded-full border border-white bg-white/70 p-2 text-[#63636f] shadow-sm transition hover:text-[#312e72]" title="Выйти" onClick={logout}><LogOut className="size-3.5" /></button>}
+    </header>
+    <section className="mx-auto max-w-5xl px-5 pb-12 sm:px-8">
+      {screen.kind === 'projects' ? <>
+        <p className="text-xs font-semibold uppercase tracking-[.16em] text-[#777786]">Проекты</p><h2 className="mt-1 text-3xl font-semibold tracking-[-.05em]">Инженерные проекты</h2>
+        <p className="mt-3 max-w-2xl text-sm leading-6 text-[#767682]">В проекте находятся отдельные рабочие области: каждая хранит своё поле шкафа, ответы блоков и результаты расчёта.</p>
+        <form onSubmit={createProject} className="mt-7 flex max-w-xl gap-2 rounded-[24px] border border-white bg-white/75 p-3 shadow-[0_14px_50px_rgba(28,29,44,.07)] backdrop-blur"><Input aria-label="Название проекта" value={projectName} maxLength={80} onChange={(event) => setProjectName(event.target.value)} placeholder="Например, ПС Северная" /><Button type="submit"><Plus className="size-4" />Создать</Button></form>
+        {!catalog.projects.length ? <div className="mt-7 rounded-[28px] border border-dashed border-[#d9d9e3] bg-white/55 p-8 text-sm leading-6 text-[#777786]">Пока нет проектов. Создай первый — в нём сразу появится «Рабочая область 1».</div> : <div className="mt-7 grid gap-4 sm:grid-cols-2">{catalog.projects.map((item) => <button key={item.id} type="button" onClick={() => setScreen({ kind: 'workspaces', projectId: item.id })} className="l-glow rounded-[28px] bg-white p-6 text-left transition hover:-translate-y-0.5"><FolderKanban className="size-6 text-[#7669dc]" /><h3 className="mt-5 text-lg font-semibold">{item.name}</h3><p className="mt-1 text-sm text-[#747480]">{item.workspaces.length} раб. {item.workspaces.length === 1 ? 'область' : 'области'} · открыть</p></button>)}</div>}
+      </> : project ? <>
+        <button type="button" onClick={() => setScreen({ kind: 'projects' })} className="mb-5 flex items-center gap-2 text-sm font-medium text-[#6254ca]"><ArrowLeft className="size-4" />Все проекты</button>
+        <p className="text-xs font-semibold uppercase tracking-[.16em] text-[#777786]">Проект</p><h2 className="mt-1 text-3xl font-semibold tracking-[-.05em]">{project.name}</h2>
+        <p className="mt-3 text-sm leading-6 text-[#767682]">Рабочие области разделяют шкафы и их черновики. Внутри одной области собирается один состав шкафа.</p>
+        <form onSubmit={createWorkspace} className="mt-7 flex max-w-xl gap-2 rounded-[24px] border border-white bg-white/75 p-3 shadow-[0_14px_50px_rgba(28,29,44,.07)] backdrop-blur"><Input aria-label="Название рабочей области" value={workspaceName} maxLength={80} onChange={(event) => setWorkspaceName(event.target.value)} placeholder={`Рабочая область ${project.workspaces.length + 1}`} /><Button type="submit"><Plus className="size-4" />Добавить</Button></form>
+        <div className="mt-7 grid gap-4 sm:grid-cols-2">{project.workspaces.map((item) => <button key={item.id} type="button" onClick={() => setScreen({ kind: 'cabinet', projectId: project.id, workspaceId: item.id })} className="l-glow rounded-[28px] bg-white p-6 text-left transition hover:-translate-y-0.5"><Layers3 className="size-6 text-[#7669dc]" /><h3 className="mt-5 text-lg font-semibold">{item.name}</h3><p className="mt-1 text-sm text-[#747480]">Поле шкафа · открыть</p></button>)}</div>
+      </> : null}
+    </section>
+  </main>;
+}
+
+function CabinetApp({ user, project, workspace, onBack, onLogout }: { user: string | null; project: LocalProject; workspace: LocalWorkspace; onBack: () => void; onLogout: () => void }) {
+  const [savedProject] = useState(() => loadLocalWorkspace(user, project.id, workspace.id));
+  const [motors, setMotors] = useState<MotorBlock[]>(() => savedProject.motors.map((motor: StoredMotor) => ({ ...motor, requested: false, generation: { status: 'idle' } })));
+  const [activeMotorId, setActiveMotorId] = useState<string | null>(savedProject.activeMotorId);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [cabinetGeneration, setCabinetGeneration] = useState<Generation>({
@@ -114,6 +240,13 @@ export default function Home() {
   const inputVersion = JSON.stringify(
     motors.map(({ id, tag, state }) => ({ id, tag, state })),
   );
+  useEffect(() => {
+    saveLocalWorkspace(user, project.id, workspace.id, {
+      motors: motors.map(({ id, tag, cell, state }) => ({ id, tag, cell, state })),
+      activeMotorId,
+      sheetOpen,
+    });
+  }, [user, project.id, workspace.id, motors, activeMotorId, sheetOpen]);
   const latestVersion = useRef(inputVersion);
   latestVersion.current = inputVersion;
   useEffect(() => {
@@ -376,14 +509,16 @@ export default function Home() {
             <h1 className="text-sm font-bold tracking-[-.02em]">
               L Constructor
             </h1>
-            <p className="text-xs text-[#747480]">
-              сборка шкафа · локальный проект
-            </p>
+            <p className="text-xs text-[#747480]">{project.name} · {workspace.name}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2 rounded-full border border-white bg-white/70 px-3 py-1.5 text-xs font-medium text-[#63636f] shadow-sm">
-          <Layers3 className="size-3.5 text-[#7669dc]" />
-          {motors.length ? blockCountLabel(motors.length) : 'поле пустое'}
+        <div className="flex items-center gap-2">
+          <button type="button" className="rounded-full border border-white bg-white/70 px-3 py-1.5 text-xs font-medium text-[#6254ca] shadow-sm transition hover:text-[#312e72]" onClick={onBack}><ArrowLeft className="mr-1 inline size-3.5" />Области</button>
+          <div className="flex items-center gap-2 rounded-full border border-white bg-white/70 px-3 py-1.5 text-xs font-medium text-[#63636f] shadow-sm">
+            <Layers3 className="size-3.5 text-[#7669dc]" />
+            {motors.length ? blockCountLabel(motors.length) : 'поле пустое'}
+          </div>
+          {user && <button type="button" className="rounded-full border border-white bg-white/70 p-2 text-[#63636f] shadow-sm transition hover:text-[#312e72]" title="Выйти" onClick={onLogout}><LogOut className="size-3.5" /></button>}
         </div>
       </header>
       <div className="mx-auto grid max-w-7xl grid-cols-1 gap-5 px-5 pb-10 sm:px-8 lg:grid-cols-[minmax(0,1fr)_320px]">
@@ -532,8 +667,9 @@ export default function Home() {
                 Скачать расчёт JSON
               </Button>
               <p className="text-[11px] leading-4 text-[#85858f]">
-                Ответы хранятся в текущей вкладке. До перезагрузки скачай
-                расчёт; восстановление проекта из JSON пока не реализовано.
+                Поле и ответы сохраняются в этой рабочей области локально в
+                браузере и восстанавливаются после обновления. Перенос на
+                другой компьютер и серверное хранение пока не реализованы.
               </p>
             </div>
           </section>

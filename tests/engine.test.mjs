@@ -32,6 +32,14 @@ const {
   cloneQuestionnaireState,
   removeBlockById,
 } = await jiti.import('../lib/client-id.ts');
+const {
+  addWorkspace,
+  catalogStorageKey,
+  decodeCatalog,
+  encodeCatalog,
+  newProject,
+  workspaceStorageKey,
+} = await jiti.import('../lib/project-storage.ts');
 
 function complete(withSensors = false) {
   const state = structuredClone(q.initialQuestionnaireState);
@@ -301,6 +309,19 @@ test('block id generation works on HTTP where crypto.randomUUID is unavailable',
   assert.match(first, /^local-[a-z0-9]+-[a-z0-9]+$/);
   assert.notEqual(first, second);
   assert.equal(createClientId(() => 'native-id'), 'native-id');
+});
+
+test('local account catalog separates projects and their workspaces', () => {
+  const first = newProject('ПС Северная', '2026-09-18T00:00:00.000Z', 'project-north');
+  const catalog = addWorkspace(
+    { projects: [first] }, first.id, 'Шкаф приточной установки',
+    '2026-09-18T01:00:00.000Z', 'workspace-supply',
+  );
+  assert.equal(catalog.projects[0].workspaces.length, 2);
+  assert.equal(catalog.projects[0].workspaces[1].name, 'Шкаф приточной установки');
+  assert.deepEqual(decodeCatalog(encodeCatalog(catalog)), catalog);
+  assert.equal(catalogStorageKey('Engineer-1'), 'l-constructor:projects:v2:engineer-1');
+  assert.equal(workspaceStorageKey('engineer-1', 'project-north', 'workspace-supply'), 'l-constructor:workspace:v2:engineer-1:project-north:workspace-supply');
 });
 
 test('Python migration matches frozen TypeScript results including graph and boundary cases', () => {

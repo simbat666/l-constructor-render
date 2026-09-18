@@ -1,4 +1,5 @@
 /** Same-origin bridge. The private CAD process is never addressed by the browser. */
+import { requireSession } from '@/lib/auth';
 const upstream = process.env.L_DXF_INTERNAL_URL || 'http://127.0.0.1:3001';
 async function forward(request: Request) {
   const path = new URL(request.url).pathname.replace(/^\/api\/cad/, '');
@@ -14,6 +15,10 @@ async function forward(request: Request) {
       { error: 'Неизвестный CAD endpoint' },
       { status: 404 },
     );
+  if (path !== '/healthz') {
+    const denied = requireSession(request);
+    if (denied) return denied;
+  }
   try {
     const body = request.method === 'POST' ? await request.text() : undefined;
     if (body && new TextEncoder().encode(body).length > 1_000_000)
