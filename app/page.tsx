@@ -33,9 +33,13 @@ import {
 } from '@/lib/client-id';
 import {
   addWorkspace,
+  deleteLocalProject,
+  deleteLocalWorkspace,
   loadLocalCatalog,
   loadLocalWorkspace,
   newProject,
+  removeProject,
+  removeWorkspace,
   saveLocalCatalog,
   saveLocalWorkspace,
   type LocalProject,
@@ -194,6 +198,21 @@ function ProjectHome({ user, onLogout }: { user: string | null; onLogout: () => 
     const next = addWorkspace(catalog, project.id, workspaceName);
     saveLocalCatalog(user, next); setCatalog(next); setWorkspaceName('');
   };
+  const deleteProject = (target: LocalProject) => {
+    if (!window.confirm(`Удалить проект «${target.name}» и все его рабочие области? Это удалит сохранённые в этом браузере блоки и ответы.`)) return;
+    deleteLocalProject(user, target);
+    const next = removeProject(catalog, target.id);
+    saveLocalCatalog(user, next);
+    setCatalog(next);
+    setScreen({ kind: 'projects' });
+  };
+  const deleteWorkspace = (target: LocalWorkspace) => {
+    if (!project || !window.confirm(`Удалить рабочую область «${target.name}»? Её блоки и ответы будут удалены только из этого браузера.`)) return;
+    deleteLocalWorkspace(user, project.id, target.id);
+    const next = removeWorkspace(catalog, project.id, target.id);
+    saveLocalCatalog(user, next);
+    setCatalog(next);
+  };
   const logout = async () => { await fetch('/api/auth/logout', { method: 'POST' }); onLogout(); };
   if (screen.kind === 'cabinet') {
     const workspace = project?.workspaces.find((item) => item.id === screen.workspaceId);
@@ -209,13 +228,13 @@ function ProjectHome({ user, onLogout }: { user: string | null; onLogout: () => 
         <p className="text-xs font-semibold uppercase tracking-[.16em] text-[#777786]">Проекты</p><h2 className="mt-1 text-3xl font-semibold tracking-[-.05em]">Инженерные проекты</h2>
         <p className="mt-3 max-w-2xl text-sm leading-6 text-[#767682]">В проекте находятся отдельные рабочие области: каждая хранит своё поле шкафа, ответы блоков и результаты расчёта.</p>
         <form onSubmit={createProject} className="mt-7 flex max-w-xl gap-2 rounded-[24px] border border-white bg-white/75 p-3 shadow-[0_14px_50px_rgba(28,29,44,.07)] backdrop-blur"><Input aria-label="Название проекта" value={projectName} maxLength={80} onChange={(event) => setProjectName(event.target.value)} placeholder="Например, ПС Северная" /><Button type="submit"><Plus className="size-4" />Создать</Button></form>
-        {!catalog.projects.length ? <div className="mt-7 rounded-[28px] border border-dashed border-[#d9d9e3] bg-white/55 p-8 text-sm leading-6 text-[#777786]">Пока нет проектов. Создай первый — в нём сразу появится «Рабочая область 1».</div> : <div className="mt-7 grid gap-4 sm:grid-cols-2">{catalog.projects.map((item) => <button key={item.id} type="button" onClick={() => setScreen({ kind: 'workspaces', projectId: item.id })} className="l-glow rounded-[28px] bg-white p-6 text-left transition hover:-translate-y-0.5"><FolderKanban className="size-6 text-[#7669dc]" /><h3 className="mt-5 text-lg font-semibold">{item.name}</h3><p className="mt-1 text-sm text-[#747480]">{item.workspaces.length} раб. {item.workspaces.length === 1 ? 'область' : 'области'} · открыть</p></button>)}</div>}
+        {!catalog.projects.length ? <div className="mt-7 rounded-[28px] border border-dashed border-[#d9d9e3] bg-white/55 p-8 text-sm leading-6 text-[#777786]">Пока нет проектов. Создай первый — в нём сразу появится «Рабочая область 1».</div> : <div className="mt-7 grid gap-4 sm:grid-cols-2">{catalog.projects.map((item) => <article key={item.id} className="l-glow relative rounded-[28px] bg-white p-6 transition hover:-translate-y-0.5"><button type="button" onClick={() => setScreen({ kind: 'workspaces', projectId: item.id })} className="block w-full text-left"><FolderKanban className="size-6 text-[#7669dc]" /><h3 className="mt-5 text-lg font-semibold">{item.name}</h3><p className="mt-1 text-sm text-[#747480]">{item.workspaces.length} раб. {item.workspaces.length === 1 ? 'область' : 'области'} · открыть</p></button><button type="button" aria-label={`Удалить проект ${item.name}`} title="Удалить проект" onClick={() => deleteProject(item)} className="absolute right-4 top-4 rounded-full p-2 text-[#8d8d9a] transition hover:bg-[#fff0f3] hover:text-[#c83c58]"><Trash2 className="size-4" /></button></article>)}</div>}
       </> : project ? <>
         <button type="button" onClick={() => setScreen({ kind: 'projects' })} className="mb-5 flex items-center gap-2 text-sm font-medium text-[#6254ca]"><ArrowLeft className="size-4" />Все проекты</button>
         <p className="text-xs font-semibold uppercase tracking-[.16em] text-[#777786]">Проект</p><h2 className="mt-1 text-3xl font-semibold tracking-[-.05em]">{project.name}</h2>
         <p className="mt-3 text-sm leading-6 text-[#767682]">Рабочие области разделяют шкафы и их черновики. Внутри одной области собирается один состав шкафа.</p>
         <form onSubmit={createWorkspace} className="mt-7 flex max-w-xl gap-2 rounded-[24px] border border-white bg-white/75 p-3 shadow-[0_14px_50px_rgba(28,29,44,.07)] backdrop-blur"><Input aria-label="Название рабочей области" value={workspaceName} maxLength={80} onChange={(event) => setWorkspaceName(event.target.value)} placeholder={`Рабочая область ${project.workspaces.length + 1}`} /><Button type="submit"><Plus className="size-4" />Добавить</Button></form>
-        <div className="mt-7 grid gap-4 sm:grid-cols-2">{project.workspaces.map((item) => <button key={item.id} type="button" onClick={() => setScreen({ kind: 'cabinet', projectId: project.id, workspaceId: item.id })} className="l-glow rounded-[28px] bg-white p-6 text-left transition hover:-translate-y-0.5"><Layers3 className="size-6 text-[#7669dc]" /><h3 className="mt-5 text-lg font-semibold">{item.name}</h3><p className="mt-1 text-sm text-[#747480]">Поле шкафа · открыть</p></button>)}</div>
+        {!project.workspaces.length ? <div className="mt-7 rounded-[28px] border border-dashed border-[#d9d9e3] bg-white/55 p-8 text-sm leading-6 text-[#777786]">В проекте пока нет рабочих областей. Добавь новую выше.</div> : <div className="mt-7 grid gap-4 sm:grid-cols-2">{project.workspaces.map((item) => <article key={item.id} className="l-glow relative rounded-[28px] bg-white p-6 transition hover:-translate-y-0.5"><button type="button" onClick={() => setScreen({ kind: 'cabinet', projectId: project.id, workspaceId: item.id })} className="block w-full text-left"><Layers3 className="size-6 text-[#7669dc]" /><h3 className="mt-5 text-lg font-semibold">{item.name}</h3><p className="mt-1 text-sm text-[#747480]">Поле шкафа · открыть</p></button><button type="button" aria-label={`Удалить рабочую область ${item.name}`} title="Удалить рабочую область" onClick={() => deleteWorkspace(item)} className="absolute right-4 top-4 rounded-full p-2 text-[#8d8d9a] transition hover:bg-[#fff0f3] hover:text-[#c83c58]"><Trash2 className="size-4" /></button></article>)}</div>}
       </> : null}
     </section>
   </main>;

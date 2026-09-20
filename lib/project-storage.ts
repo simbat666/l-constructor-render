@@ -176,6 +176,22 @@ export function addWorkspace(catalog: LocalProjectCatalog, projectId: string, na
   };
 }
 
+/** Remove one workspace from the catalogue. Its saved field is removed separately. */
+export function removeWorkspace(catalog: LocalProjectCatalog, projectId: string, workspaceId: string, now = new Date().toISOString()): LocalProjectCatalog {
+  return {
+    projects: catalog.projects.map((project) => project.id !== projectId ? project : {
+      ...project,
+      updatedAt: now,
+      workspaces: project.workspaces.filter((workspace) => workspace.id !== workspaceId),
+    }),
+  };
+}
+
+/** Remove one project from the catalogue. Its workspace drafts are removed separately. */
+export function removeProject(catalog: LocalProjectCatalog, projectId: string): LocalProjectCatalog {
+  return { projects: catalog.projects.filter((project) => project.id !== projectId) };
+}
+
 function legacyCatalog(raw: string | null, now = new Date().toISOString()) {
   if (!raw) return null;
   const draft = decodeProject(raw);
@@ -220,4 +236,15 @@ export function saveLocalWorkspace(user: string | null, projectId: string, works
   try { window.localStorage.setItem(workspaceStorageKey(user, projectId, workspaceId), encodeProject(project)); } catch {
     // A private-mode or full storage quota must not break the engineering UI.
   }
+}
+
+export function deleteLocalWorkspace(user: string | null, projectId: string, workspaceId: string) {
+  if (typeof window === 'undefined') return;
+  try { window.localStorage.removeItem(workspaceStorageKey(user, projectId, workspaceId)); } catch {
+    // The catalogue update must still leave the UI usable if storage is unavailable.
+  }
+}
+
+export function deleteLocalProject(user: string | null, project: LocalProject) {
+  for (const workspace of project.workspaces) deleteLocalWorkspace(user, project.id, workspace.id);
 }
