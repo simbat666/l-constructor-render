@@ -19,7 +19,7 @@ from openpyxl import load_workbook
 
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_SOURCE = ROOT / "data" / "rules-source" / "ОЛ - Электродвигатель асинхронный_В2 [Whxlew].xlsx"
+DEFAULT_SOURCE = ROOT / "data" / "rules-source" / "ОЛ - Электродвигатель асинхронный_В2 [ldYljg].xlsx"
 DEFAULT_TARGET = ROOT / "data" / "motor-v2.json"
 
 
@@ -105,16 +105,38 @@ def validate_question_graph(question_sets: list[list[dict[str, object]]]) -> Non
         raise ValueError("Ссылки ведут на несуществующие вопросы: " + ", ".join(missing))
 
 
-def io(row, offset=11):
-    labels = ["di0", "di24", "doTransistor", "doRelay", "aiPt1000", "ai420", "ai010", "ao420", "ao010"]
-    return {label: value(row[offset + index]) or 0 for index, label in enumerate(labels)}
+IO_CODES = ("DI24-HSC-NPN", "DI24-NPN", "DI24-PNP", "DOT-PNP", "DOR-NO",
+            "AI-RTD2", "AI-I0_20-PAS", "AI-I4_20-PAS", "AI-U0_10",
+            "AO-U0_10", "RS-485")
+
+
+def required_columns(ws, names):
+    columns = headers(ws)
+    missing = sorted(set(names) - set(columns))
+    if missing:
+        raise ValueError(f"Лист {ws.title}: отсутствуют колонки: {', '.join(missing)}")
+    return columns
+
+
+def cell(row, columns, name):
+    return value(row[columns[name]]) if name in columns else None
+
+
+def io(row, columns, source_row):
+    result = {}
+    for code in IO_CODES:
+        raw = cell(row, columns, code)
+        if isinstance(raw, bool) or not isinstance(raw, (int, float)) or raw < 0 or int(raw) != raw:
+            raise ValueError(f"Лист I/O, строка {source_row}: {code} должен быть целым неотрицательным числом")
+        result[code] = int(raw)
+    return result
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Extract a production rule snapshot from a motor OL workbook")
     parser.add_argument("--source", type=Path, default=DEFAULT_SOURCE, help="Source .xlsx workbook")
     parser.add_argument("--target", type=Path, default=DEFAULT_TARGET, help="Target JSON rule snapshot")
-    parser.add_argument("--revision", default="В2 Whxlew · supplied OL", help="Human-readable source revision stored in JSON")
+    parser.add_argument("--revision", help="Human-readable source revision stored in JSON; defaults to source stem")
     return parser.parse_args()
 
 
@@ -154,30 +176,47 @@ def main():
         })
 
     diagrams1 = []
-    for excel_row, row in enumerate(rows(book["diagram 1"])[1:], start=2):
-        if row[9] is None:
+    d1 = book["diagram 1"]
+    c1 = required_columns(d1, ["Motor starting / control method", "Location (VFD start / Triac speed control)",
+        "Rated voltage, V", "Circuit breaker trip type", "controller_Manufacturer (Brand)",
+        "controller_Type", "electrical diagram 1", "electrical diagram 2", "lines_amount",
+        "consumption_current", *IO_CODES])
+    for excel_row, row in enumerate(rows(d1)[1:], start=2):
+        if cell(row, c1, "electrical diagram 1") is None:
             continue
         diagrams1.append({
-            "sourceRow": excel_row, "startCode": value(row[0]), "start": value(row[1]),
-            "locationCode": value(row[2]), "location": value(row[3]),
-            "voltageCode": value(row[4]), "voltage": value(row[5]),
-            "tripCode": value(row[6]), "trip": value(row[7]), "controller": value(row[8]),
-            "diagram1": value(row[9]), "diagram2": value(row[10]), "io": io(row),
-            "linesAmount": value(row[20]), "consumptionCurrent": value(row[21]), "placement": value(row[22]),
+            "sourceRow": excel_row, "startCode": cell(row, c1, "Motor starting / control method"),
+            "start": cell(row, c1, "Способ пуска / управления двигателем"),
+            "locationCode": cell(row, c1, "Location (VFD start / Triac speed control)"),
+            "location": cell(row, c1, "Расположение (ЧП / Симисторный регулятор скорости)"),
+            "voltageCode": cell(row, c1, "Rated voltage, V"), "voltage": cell(row, c1, "Номинальное напряжение, В"),
+            "tripCode": cell(row, c1, "Circuit breaker trip type"), "trip": cell(row, c1, "Тип защиты автоматического выключателя"),
+            "controller": cell(row, c1, "controller_Manufacturer (Brand)"), "controllerType": cell(row, c1, "controller_Type"),
+            "diagram1": cell(row, c1, "electrical diagram 1"), "diagram2": cell(row, c1, "electrical diagram 2"),
+            "io": io(row, c1, excel_row), "linesAmount": cell(row, c1, "lines_amount"),
+            "consumptionCurrent": cell(row, c1, "consumption_current"), "placement": cell(row, c1, "diagram placement"),
         })
 
     diagrams2 = []
-    for excel_row, row in enumerate(rows(book["diagram 2"])[1:], start=2):
-        if row[9] is None:
+    d2 = book["diagram 2"]
+    c2 = required_columns(d2, ["Thermal overload contact (bimetallic)", "PTC thermistor protection",
+        "Winding RTD (Pt100)", "Connection type_Bearing temperature sensor (RTD) (Pt100)",
+        "controller_Manufacturer (Brand)", "controller_Type", "electrical diagram 1",
+        "electrical diagram 2", "lines_amount", "consumption_current", *IO_CODES])
+    for excel_row, row in enumerate(rows(d2)[1:], start=2):
+        if cell(row, c2, "electrical diagram 1") is None:
             continue
         diagrams2.append({
-            "sourceRow": excel_row, "thermalCode": value(row[0]), "thermal": value(row[1]),
-            "ptcCode": value(row[2]), "ptc": value(row[3]),
-            "windingWireCode": value(row[4]), "windingWire": value(row[5]),
-            "bearingWireCode": value(row[6]), "bearingWire": value(row[7]),
-            "controller": value(row[8]), "diagram1": value(row[9]), "diagram2": value(row[10]),
-            "io": io(row), "linesAmount": value(row[20]), "consumptionCurrent": value(row[21]),
-            "placement": value(row[22]),
+            "sourceRow": excel_row, "thermalCode": cell(row, c2, "Thermal overload contact (bimetallic)"),
+            "thermal": value(row[c2["Thermal overload contact (bimetallic)"] + 1]),
+            "ptcCode": cell(row, c2, "PTC thermistor protection"), "ptc": value(row[c2["PTC thermistor protection"] + 1]),
+            "windingWireCode": cell(row, c2, "Winding RTD (Pt100)"), "windingWire": value(row[c2["Winding RTD (Pt100)"] + 1]),
+            "bearingWireCode": cell(row, c2, "Connection type_Bearing temperature sensor (RTD) (Pt100)"),
+            "bearingWire": value(row[c2["Connection type_Bearing temperature sensor (RTD) (Pt100)"] + 1]),
+            "controller": cell(row, c2, "controller_Manufacturer (Brand)"), "controllerType": cell(row, c2, "controller_Type"),
+            "diagram1": cell(row, c2, "electrical diagram 1"), "diagram2": cell(row, c2, "electrical diagram 2"),
+            "io": io(row, c2, excel_row), "linesAmount": cell(row, c2, "lines_amount"),
+            "consumptionCurrent": cell(row, c2, "consumption_current"), "placement": cell(row, c2, "diagram placement"),
         })
 
     manualVfd = []
@@ -207,8 +246,8 @@ def main():
     target = args.target.expanduser().resolve()
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(json.dumps({
-        "rulesSchemaVersion": 2,
-        "source": {"file": source.name, "revision": args.revision, "sha256": hashlib.sha256(source.read_bytes()).hexdigest(), "sheets": ["Ques 1", "Ques 2", "Ques 3", "Ques 4", "Load index 1", "Load index 2", "diagram 1", "diagram 2", "sp1", "sp2", "sp3", "sp4"]},
+        "rulesSchemaVersion": 3,
+        "source": {"file": source.name, "revision": args.revision or source.stem, "sha256": hashlib.sha256(source.read_bytes()).hexdigest(), "sheets": ["Ques 1", "Ques 2", "Ques 3", "Ques 4", "Load index 1", "Load index 2", "diagram 1", "diagram 2", "sp1", "sp2", "sp3", "sp4"]},
         "questions1": questions1, "questions2": questions2, "questions3": questions3, "questions4": questions4, "loadIndex1": index1, "loadIndex2": index2, "diagrams1": diagrams1, "diagrams2": diagrams2,
         "manualVfd": manualVfd, "automaticVfd": automaticVfd, "sensorSpecification": sensorSpecification, "mainSpecification": mainSpecification,
     }, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")

@@ -17,7 +17,10 @@ export type VisibleGroup = {
 export type ProjectMotor = { id: string; tag: string; state: QuestionnaireState };
 type TraceEntry = { id: string; title: string; detail: string; source?: string };
 type SchemeRow = Record<string, any>;
-type Channel = { family: string; address: string };
+export type Channel = {
+  family: string; address: string; terminals: string[]; group: string;
+  commonKey: string | null; source: string;
+};
 export type Calculation = {
   schemaVersion: number; ruleFingerprint: string; status: string;
   blocks: Array<ProjectMotor & {

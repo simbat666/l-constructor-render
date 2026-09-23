@@ -16,8 +16,8 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
 import local_cad_api as api
-from cabinet_engine import evaluate_project, validate_project, RevisionConflict
-from questionnaire import BASE, initial_state, visible_groups, numeric_rule, prune_state
+from cabinet_engine import evaluate_project, validate_project, RevisionConflict, RULE_FINGERPRINT
+from questionnaire import initial_state, visible_groups, numeric_rule, prune_state
 
 def complete():
     state = initial_state()
@@ -77,8 +77,8 @@ class EngineApiTests(unittest.TestCase):
 
     def test_old_revision_and_client_manifest_cannot_export(self):
         self.assertEqual(self.post('/generate', {'motors': [complete()], 'ruleFingerprint': 'old'})[0], 409)
-        self.assertEqual(self.post('/generate', {'instances': [{'id': 'fake', 'code': 'im1-011'}], 'ruleFingerprint': BASE['source']['sha256']})[0], 422)
-        self.assertEqual(self.post('/generate', {'motors': [dict(id='one', tag='M1', state=initial_state())], 'ruleFingerprint': BASE['source']['sha256']})[0], 422)
+        self.assertEqual(self.post('/generate', {'instances': [{'id': 'fake', 'code': 'im1-011'}], 'ruleFingerprint': RULE_FINGERPRINT})[0], 422)
+        self.assertEqual(self.post('/generate', {'motors': [dict(id='one', tag='M1', state=initial_state())], 'ruleFingerprint': RULE_FINGERPRINT})[0], 422)
 
     def test_hidden_answers_are_removed_and_result_recomputed(self):
         motor = complete()
@@ -99,17 +99,17 @@ class EngineApiTests(unittest.TestCase):
                 target.write_bytes(b'x' * 1024)
                 return type('Result', (), dict(returncode=0, stdout='assembled'))()
             with patch.object(api, 'OUTPUT', Path(directory)), patch.object(api.subprocess, 'run', side_effect=assemble):
-                status, result = self.post('/generate', {'motors': [motor], 'ruleFingerprint': BASE['source']['sha256'], 'instances': [{'id': 'forged', 'code': 'im1-011'}]})
+                status, result = self.post('/generate', {'motors': [motor], 'ruleFingerprint': RULE_FINGERPRINT, 'instances': [{'id': 'forged', 'code': 'im1-011'}]})
                 self.assertEqual(status, 200, result)
 
     def test_unknown_block_export_rejected(self):
-        self.assertEqual(self.post('/generate', {'motors': [complete()], 'blockId': 'other', 'ruleFingerprint': BASE['source']['sha256']})[0], 422)
+        self.assertEqual(self.post('/generate', {'motors': [complete()], 'blockId': 'other', 'ruleFingerprint': RULE_FINGERPRINT})[0], 422)
 
     def test_real_export_downloads_two_documents_with_repeated_blocks(self):
         first = complete()
         second = dict(copy.deepcopy(first), id='two', tag='M2')
         with tempfile.TemporaryDirectory(prefix='l-http-cad-') as directory, patch.object(api, 'OUTPUT', Path(directory)):
-            status, result = self.post('/generate', {'motors': [first, second], 'ruleFingerprint': BASE['source']['sha256']})
+            status, result = self.post('/generate', {'motors': [first, second], 'ruleFingerprint': RULE_FINGERPRINT})
             self.assertEqual(status, 200, result)
             self.assertEqual(len(result['drawings']), 2)
             for drawing in result['drawings']:

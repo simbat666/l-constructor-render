@@ -21,10 +21,17 @@ assembler = module('assemble_dxf_package')
 
 class CadTests(unittest.TestCase):
     def test_device_designations_are_scoped_to_the_full_cabinet(self):
-        selected = assembler.load_selected(assembler.DEFAULT_LIBRARY, assembler.DEFAULT_DXF_SOURCES, ['im1-011', 'im1-011'])
+        selected = assembler.load_selected(
+            assembler.DEFAULT_LIBRARY,
+            assembler.DEFAULT_DXF_SOURCES,
+            ['im1-011', 'im1-011'],
+        )
         with tempfile.TemporaryDirectory(prefix='l-designations-test-') as directory:
             output = Path(directory) / 'result.dxf'
-            assembler.assemble(assembler.split_pages(assembler.load_and_validate(selected)), output)
+            assembler.assemble(
+                assembler.split_pages(assembler.load_and_validate(selected)),
+                output,
+            )
             document = ezdxf.readfile(output)
             actual = {
                 (assembler.source_layer_name(entity.dxf.layer), assembler.mtext_plain(entity))
@@ -39,17 +46,29 @@ class CadTests(unittest.TestCase):
             all_markers = {
                 (assembler.source_layer_name(entity.dxf.layer), assembler.mtext_plain(entity))
                 for entity in document.modelspace()
-                if entity.dxftype() == 'MTEXT' and assembler.PLACEHOLDER.fullmatch(assembler.mtext_plain(entity))
+                if entity.dxftype() == 'MTEXT'
+                and assembler.PLACEHOLDER.fullmatch(assembler.mtext_plain(entity))
             }
+            # The identical marker on a terminal or header layer is not a
+            # device number and must survive repeated device templates intact.
             self.assertIn(('XT1', '#1'), all_markers)
             self.assertIn(('XT7', '#2'), all_markers)
             self.assertIn(('Headers', '#1'), all_markers)
 
     def test_device_renumbering_trace_keeps_source_layer_and_handle(self):
-        selected = assembler.load_selected(assembler.DEFAULT_LIBRARY, assembler.DEFAULT_DXF_SOURCES, ['im1-054', 'im1-054'])
+        selected = assembler.load_selected(
+            assembler.DEFAULT_LIBRARY,
+            assembler.DEFAULT_DXF_SOURCES,
+            ['im1-054', 'im1-054'],
+        )
         with tempfile.TemporaryDirectory(prefix='l-designation-trace-test-') as directory:
             trace = []
-            assembler.assemble(assembler.split_pages(assembler.load_and_validate(selected)), Path(directory) / 'result.dxf', parameter_trace=trace, drawing_kind='electrical')
+            assembler.assemble(
+                assembler.split_pages(assembler.load_and_validate(selected)),
+                Path(directory) / 'result.dxf',
+                parameter_trace=trace,
+                drawing_kind='electrical',
+            )
         self.assertTrue(trace)
         self.assertEqual({item['layer'] for item in trace}, {'QF', 'KL'})
         self.assertTrue(all(item['placeholderHandle'] for item in trace))

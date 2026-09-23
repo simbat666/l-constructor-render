@@ -25,6 +25,7 @@ import {
   useEngineering,
   type QuestionnaireState,
   type VisibleGroup,
+  type Channel,
 } from '@/lib/engineering-client';
 import {
   cloneQuestionnaireState,
@@ -628,8 +629,9 @@ function CabinetApp({ user, project, workspace, onBack, onLogout }: { user: stri
               </div>
             )}
             <div className="mt-5 rounded-2xl bg-[#f4f4f8] p-4 text-xs leading-5 text-[#777786]">
-              Логический план I/O учитывает двигатели и дополнительные датчики.
-              Физические каналы контроллера ещё не подобраны.
+              I/O распределяются по совместимым выводам ZENTEC M245 для всех
+              двигателей и дополнительных датчиков шкафа. Клеммы XT и связи GND/COM
+              в DXF пока не назначаются.
             </div>
             <div className="mt-5 space-y-3 border-t border-[#e4e4ed] pt-5">
               <h3 className="text-sm font-semibold">Схемы всего шкафа</h3>
@@ -964,7 +966,7 @@ function QuestionnaireSheet({
   setRequested: (value: boolean) => void;
   diagramRows: DiagramRow[];
   selectedMain?: DiagramRow;
-  channels: Array<{ family: string; address: string }>;
+  channels: Channel[];
   optionalRows: OptionalRow[];
   missing: string[];
   schemeCodes: string[];
@@ -1277,7 +1279,7 @@ function DiagramResult({
   canExport: boolean;
   rows: DiagramRow[];
   selectedMain?: DiagramRow;
-  channels: Array<{ family: string; address: string }>;
+  channels: Channel[];
   optionalRows: OptionalRow[];
   missing: string[];
   requested: boolean;
@@ -1299,8 +1301,8 @@ function DiagramResult({
       ) : requested && selectedMain ? (
         <>
           <p className="text-sm text-[#747480]">
-            Выбран вариант схемы и назначены логические номера сигналов. Это ещё
-            не физические клеммы контроллера.
+            Выбран вариант схемы и назначены выводы ПЛК по таблице ZENTEC M245.
+            Их маркировка в DXF пока не подставляется.
           </p>
           <DiagramTable
             rows={[{ row: selectedMain, sourceOrder: 'I/O optimizer' }]}
@@ -1308,11 +1310,11 @@ function DiagramResult({
           {channels.length > 0 && (
             <div className="rounded-2xl border border-[#dcd8ff] bg-white p-4 text-xs text-[#615d78]">
               <p className="font-semibold text-[#403b55]">
-                Логический план I/O
+                Выводы ПЛК
               </p>
               <p className="mt-2 font-mono leading-5">
                 {channels
-                  .map((channel) => `${channel.address} · ${channel.family}`)
+                  .map((channel) => [channel.terminals.join(' / '), channel.family, channel.commonKey].filter(Boolean).join(' · '))
                   .join('\n')}
               </p>
             </div>
@@ -1508,7 +1510,7 @@ function DecisionTrace({
       />
       <TraceSection
         title="Выходные данные"
-        caption="Индекс, логические сигналы и состав"
+        caption="Индекс, выводы ПЛК и состав"
         entries={trace.outputs}
         empty="Итог появится после заполнения обязательных параметров."
       />

@@ -6,6 +6,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 BASE = json.loads((ROOT / 'data/motor-v2.json').read_text(encoding='utf-8'))
+if BASE.get('rulesSchemaVersion') != 3:
+    raise ValueError('Нужен снимок ОЛ схемы 3; повтори импорт Excel')
 BINDINGS = json.loads((ROOT / 'data/motor-field-bindings.json').read_text(encoding='utf-8'))
 NODES = [dict(node, sheet=f'Ques {i}') for i in range(1, 5) for node in BASE.get(f'questions{i}', [])]
 BY_ORDER = {node['order']: node for node in NODES}

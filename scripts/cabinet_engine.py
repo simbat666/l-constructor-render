@@ -1,8 +1,15 @@
 """Authoritative cabinet calculation; shared by calculation and CAD endpoints."""
 import math
+import hashlib
 from questionnaire import (BASE, BINDINGS, active_answers, diagram_rows, optional_rows,
                            selections, semantic_key, norm, number, fmt, prune_state, visible_groups)
-from io_allocator import allocate_io
+from io_allocator import CATALOG, allocate_io
+
+RULE_FINGERPRINT = hashlib.sha256('|'.join((
+    BASE['source']['sha256'],
+    CATALOG['sources']['composition']['sha256'],
+    CATALOG['sources']['marking']['sha256'],
+)).encode()).hexdigest()
 
 def semantic_fields(state):
     fields = {}
@@ -44,6 +51,9 @@ def calculate_cabinet(motors):
         optional = optional_rows(motor['state'])
         for dimension in selections(motor['state'], 'diagram2.'):
             candidates = [o['row'] for o in optional if o['sourceOrder'] == dimension]
+            if dimension == 'ptc' and any(row['io'].get('AI-RTD2', 0) for row in candidates):
+                errors.append('PTC назначен на AI-RTD2 в diagram 2: совместимость этого входа с PTC не подтверждена.')
+                continue
             quantity_key = BINDINGS['optionalQuantities'].get(dimension)
             quantity = number(fields.get(quantity_key, [dict(value=math.nan)])[0]['value']) if quantity_key else 1
             if not math.isfinite(quantity) or quantity != int(quantity) or not 1 <= quantity <= 30:
@@ -58,10 +68,15 @@ def calculate_cabinet(motors):
         blocks.append(dict(motor, errors=errors, warnings=[], fields=fields, optional=[], channels=[], loadIndex=None, loadRule=None, specification=[]))
     by_id = {b['id']: b for b in blocks}
     ready = [d for d in demands if not by_id[d['blockId']]['errors']]
-    controller_sets = [{norm(r.get('controller')) for r in d['candidates'] if norm(r.get('controller'))} for d in ready]
+    controller_sets = [{(norm(r.get('controller')), norm(r.get('controllerType'))) for r in d['candidates']
+                        if norm(r.get('controller')) and norm(r.get('controllerType'))} for d in ready]
     common = set.intersection(*controller_sets) if controller_sets else set()
-    allocation_error = 'Нет общего семейства контроллера у выбранных схем.' if ready and not common else None
-    plans = [dict(controller=controller, **allocate_io([dict(d, candidates=[r for r in d['candidates'] if norm(r.get('controller')) == controller]) for d in ready])) for controller in sorted(common)]
+    supported = (norm(CATALOG['controller']['brand']), norm(CATALOG['controller']['model']))
+    allocation_error = ('Нет общей модели контроллера у выбранных схем.' if ready and not common else
+                        f"Для модели {', '.join(f'{brand} {model}' for brand, model in sorted(common))} нет проверенного каталога выводов." if common and supported not in common else None)
+    plans = [dict(controller=f'{brand.upper()} {model.upper()}', **allocate_io([
+        dict(d, candidates=[r for r in d['candidates'] if (norm(r.get('controller')), norm(r.get('controllerType'))) == (brand, model)])
+        for d in ready])) for brand, model in sorted(common) if (brand, model) == supported]
     valid_plans = [p for p in plans if not p.get('error')]
     plan = min(valid_plans, key=lambda p: sum(bool(v) for v in p.get('totals', {}).values())) if valid_plans else None
     errors = [f"{b['tag']}: {e}" for b in blocks for e in b['errors']]
@@ -150,13 +165,13 @@ def calculate_cabinet(motors):
         if block['loadIndex']:
             outputs.append(dict(id='load-index', title='Индекс нагрузки', detail=block['loadIndex'], source=load_rule['source']))
         if block['channels']:
-            outputs.append(dict(id='io', title='Логические I/O', detail=', '.join(f"{c['address']} · {c['family']}" for c in block['channels'])))
+            outputs.append(dict(id='io', title='Выводы ПЛК', detail=', '.join(f"{c['address']} · {c['family']}" for c in block['channels'])))
         for item in block['specification']:
             outputs.append(dict(id=f"spec:{item['source']}:{item['name']}", title=item['name'], detail=f"{fmt(item['quantity'])} {item['unit']}", source=item['source']))
         block['decisionTrace'] = dict(inputs=inputs, rules=rules, outputs=outputs)
-    return dict(schemaVersion=1, ruleFingerprint=BASE['source']['sha256'], status='draft', blocks=blocks, instances=instances, errors=errors, warnings=[
-        'DXF — черновая компоновка шаблонов, не выпущенная КД. Маркировки и номиналы внутри исходных шаблонов пока не параметризованы.',
-        'I/O — логические номера сигналов, не физические клеммы. Модели контроллеров, ёмкость модулей и их цена ещё не заданы.',
+    return dict(schemaVersion=1, ruleFingerprint=RULE_FINGERPRINT, status='draft', blocks=blocks, instances=instances, errors=errors, warnings=[
+        'DXF — черновая компоновка шаблонов, не выпущенная КД. QF/KM/KL нумеруются, но выводы ПЛК, XT, GND/COM, номиналы и соединения ещё не параметризованы.',
+        'Выводы ZENTEC M245 распределены по таблице ключей ПЛК. Клеммы шкафа XT, подключение GND/COM на CAD и модули расширения ещё не рассчитаны.',
     ], controllerFamily=plan['controller'] if plan else None, io=plan['totals'] if plan else {}, canExport=bool(motors) and not errors and bool(instances))
 
 class RevisionConflict(ValueError):
@@ -166,8 +181,8 @@ def validate_project(payload):
     if not isinstance(payload, dict):
         raise ValueError('Нужен объект проекта')
     fingerprint = payload.get('ruleFingerprint')
-    if fingerprint is not None and fingerprint != BASE['source']['sha256']:
-        raise RevisionConflict('База ОЛ обновилась. Повтори расчёт по текущей версии.')
+    if fingerprint is not None and fingerprint != RULE_FINGERPRINT:
+        raise RevisionConflict('Инженерная база обновилась. Повтори расчёт по текущей версии.')
     motors = payload.get('motors')
     if not isinstance(motors, list) or len(motors) > 40:
         raise ValueError('Допустимо до 40 блоков')

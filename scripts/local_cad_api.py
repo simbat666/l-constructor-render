@@ -20,8 +20,7 @@ import sys
 import uuid
 from threading import BoundedSemaphore
 from urllib.parse import unquote, urlparse
-from cabinet_engine import evaluate_project, RevisionConflict
-from questionnaire import BASE
+from cabinet_engine import evaluate_project, RevisionConflict, RULE_FINGERPRINT
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -133,8 +132,8 @@ class Handler(BaseHTTPRequestHandler):
             payload = json.loads(self.rfile.read(length).decode("utf-8"))
             if not isinstance(payload, dict):
                 raise ValueError('Нужен объект проекта')
-            if path == '/generate' and payload.get('ruleFingerprint') != BASE['source']['sha256']:
-                raise RevisionConflict('Перед экспортом пересчитай проект по текущей базе ОЛ.')
+            if path == '/generate' and payload.get('ruleFingerprint') != RULE_FINGERPRINT:
+                raise RevisionConflict('Перед экспортом пересчитай проект по текущей инженерной базе.')
             evaluated = evaluate_project(payload)
             if path == '/calculate':
                 json_response(self, HTTPStatus.OK, evaluated)
