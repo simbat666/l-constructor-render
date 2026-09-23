@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'L · инженерная лаборатория',
-  description: 'Тестовый стенд для сборки шкафа автоматики и проверки результатов.',
+  title: 'L Constructor · локальный стенд',
+  description: 'Локальный конструктор шкафов автоматики с опросными листами функциональных блоков.',
 };
 
 export default function RootLayout({

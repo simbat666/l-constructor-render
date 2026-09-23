@@ -1,0 +1,710 @@
+{
+  "format": 1,
+  "cases": [
+    {
+      "id": "empty-cabinet",
+      "motors": [],
+      "expected": {
+        "canExport": false,
+        "errors": [],
+        "controllerFamily": null,
+        "io": {},
+        "instanceCodes": [],
+        "blocks": []
+      }
+    },
+    {
+      "id": "direct-motor",
+      "motors": [
+        {
+          "id": "one",
+          "tag": "M1",
+          "state": {
+            "selected": {
+              "Ques 1:Способ пуска / управления двигателем:list": "1.1",
+              "Ques 1:Номинальное напряжение, В:radio_group": "5.1",
+              "Ques 1:Тип защиты автоматического выключателя:radio_group": "15.1",
+              "Ques 1:Статус нагрузки:radio_group": "9.1",
+              "Ques 1:Тип технологического устройства:list": "11.2"
+            },
+            "inputs": {
+              "Ques 1:6.1": "0.1",
+              "Ques 1:7.1": "0.01",
+              "Ques 1:10.1": "M1",
+              "Ques 1:10.2": "M1"
+            },
+            "checks": {
+              "Ques 1:14.1": false
+            },
+            "uploads": {}
+          }
+        }
+      ],
+      "expected": {
+        "canExport": true,
+        "errors": [],
+        "controllerFamily": "ZENTEC M245",
+        "io": {
+          "DI24-HSC-NPN": 0,
+          "DI24-NPN": 0,
+          "DI24-PNP": 1,
+          "DOT-PNP": 1,
+          "DOR-NO": 0,
+          "AI-RTD2": 0,
+          "AI-I0_20-PAS": 0,
+          "AI-I4_20-PAS": 0,
+          "AI-U0_10": 0,
+          "AO-U0_10": 0,
+          "RS-485": 0
+        },
+        "instanceCodes": [
+          "electrical:im1-014",
+          "external:im2-1"
+        ],
+        "blocks": [
+          {
+            "id": "one",
+            "mainCode": "im1-014",
+            "optionalCodes": [],
+            "loadIndex": "M3PT00016",
+            "warnings": [],
+            "channels": [
+              "01",
+              "T1"
+            ],
+            "specification": [
+              [
+                "GM2P01 (GV2P01)",
+                1,
+                "шт",
+                "sp4:719"
+              ]
+            ],
+            "rules": [
+              [
+                "Выбор основной схемы",
+                "diagram 1:38"
+              ],
+              [
+                "Подбор индекса нагрузки",
+                "Load index 1:2"
+              ]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "direct-motor-with-sensors",
+      "motors": [
+        {
+          "id": "one",
+          "tag": "M1",
+          "state": {
+            "selected": {
+              "Ques 1:Способ пуска / управления двигателем:list": "1.1",
+              "Ques 1:Номинальное напряжение, В:radio_group": "5.1",
+              "Ques 1:Тип защиты автоматического выключателя:radio_group": "15.1",
+              "Ques 1:Статус нагрузки:radio_group": "9.1",
+              "Ques 1:Тип технологического устройства:list": "11.2",
+              "Ques 2:Схема подключения Pt100_Датчик температуры обмотки Pt100:list": "33.1"
+            },
+            "inputs": {
+              "Ques 1:6.1": "0.1",
+              "Ques 1:7.1": "0.01",
+              "Ques 1:10.1": "M1",
+              "Ques 1:10.2": "M1",
+              "Ques 2:34.1": "3"
+            },
+            "checks": {
+              "Ques 1:14.1": true,
+              "Ques 2:30.1": true,
+              "Ques 2:31.1": false,
+              "Ques 2:32.1": true,
+              "Ques 2:35.1": false
+            },
+            "uploads": {}
+          }
+        }
+      ],
+      "expected": {
+        "canExport": true,
+        "errors": [],
+        "controllerFamily": "ZENTEC M245",
+        "io": {
+          "DI24-HSC-NPN": 0,
+          "DI24-NPN": 0,
+          "DI24-PNP": 2,
+          "DOT-PNP": 1,
+          "DOR-NO": 0,
+          "AI-RTD2": 3,
+          "AI-I0_20-PAS": 0,
+          "AI-I4_20-PAS": 0,
+          "AI-U0_10": 0,
+          "AO-U0_10": 0,
+          "RS-485": 0
+        },
+        "instanceCodes": [
+          "electrical:im1-014",
+          "external:im2-1",
+          "electrical:bm1-012",
+          "external:bm2-1",
+          "electrical:pr1-011",
+          "external:pr2-1",
+          "electrical:pr1-011",
+          "external:pr2-1",
+          "electrical:pr1-011",
+          "external:pr2-1"
+        ],
+        "blocks": [
+          {
+            "id": "one",
+            "mainCode": "im1-014",
+            "optionalCodes": [
+              "bm1-012",
+              "pr1-011",
+              "pr1-011",
+              "pr1-011"
+            ],
+            "loadIndex": "M3PT00016",
+            "warnings": [],
+            "channels": [
+              "01",
+              "T1",
+              "02",
+              "13",
+              "14",
+              "15"
+            ],
+            "specification": [
+              [
+                "GM2P01 (GV2P01)",
+                1,
+                "шт",
+                "sp4:719"
+              ],
+              [
+                "Клемма пружинная 2,5 мм2 (серая) арт. ZHM500GR",
+                2,
+                "шт",
+                "sp3:3 / one:thermal:1"
+              ],
+              [
+                "Клемма пружинная 2,5 мм2 (серая) арт. ZHM500GR",
+                2,
+                "шт",
+                "sp3:4 / one:windingWire:1"
+              ],
+              [
+                "Клемма пружинная 2,5 мм2 (желто-зеленая) арт. ZHT500",
+                1,
+                "шт",
+                "sp3:5 / one:windingWire:1"
+              ],
+              [
+                "Клемма пружинная 2,5 мм2 (серая) арт. ZHM500GR",
+                2,
+                "шт",
+                "sp3:4 / one:windingWire:2"
+              ],
+              [
+                "Клемма пружинная 2,5 мм2 (желто-зеленая) арт. ZHT500",
+                1,
+                "шт",
+                "sp3:5 / one:windingWire:2"
+              ],
+              [
+                "Клемма пружинная 2,5 мм2 (серая) арт. ZHM500GR",
+                2,
+                "шт",
+                "sp3:4 / one:windingWire:3"
+              ],
+              [
+                "Клемма пружинная 2,5 мм2 (желто-зеленая) арт. ZHT500",
+                1,
+                "шт",
+                "sp3:5 / one:windingWire:3"
+              ]
+            ],
+            "rules": [
+              [
+                "Выбор основной схемы",
+                "diagram 1:38"
+              ],
+              [
+                "Подбор индекса нагрузки",
+                "Load index 1:2"
+              ],
+              [
+                "Дополнительный сигнал",
+                "diagram 2:3"
+              ],
+              [
+                "Дополнительный сигнал",
+                "diagram 2:5"
+              ],
+              [
+                "Дополнительный сигнал",
+                "diagram 2:5"
+              ],
+              [
+                "Дополнительный сигнал",
+                "diagram 2:5"
+              ]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "manual-vfd",
+      "motors": [
+        {
+          "id": "one",
+          "tag": "M1",
+          "state": {
+            "selected": {
+              "Ques 1:Способ пуска / управления двигателем:list": "1.2",
+              "Ques 1:Расположение (ЧП / Симисторный регулятор скорости):list": "2.1",
+              "Ques 1:Способ подбора ЧП:list": "3.2",
+              "Ques 1:Номинальное напряжение, В:radio_group": "5.3",
+              "Ques 1:Статус нагрузки:radio_group": "9.1",
+              "Ques 3:Производитель (бренд) / Серия (Тип):list": "20.1",
+              "Ques 3:Модель / Код заказа:list": "21.2"
+            },
+            "inputs": {
+              "Ques 1:6.3": "3.2",
+              "Ques 1:7.3": "1.5"
+            },
+            "checks": {},
+            "uploads": {}
+          }
+        }
+      ],
+      "expected": {
+        "canExport": true,
+        "errors": [],
+        "controllerFamily": "ZENTEC M245",
+        "io": {
+          "DI24-HSC-NPN": 0,
+          "DI24-NPN": 0,
+          "DI24-PNP": 1,
+          "DOT-PNP": 1,
+          "DOR-NO": 0,
+          "AI-RTD2": 0,
+          "AI-I0_20-PAS": 0,
+          "AI-I4_20-PAS": 0,
+          "AI-U0_10": 0,
+          "AO-U0_10": 0,
+          "RS-485": 0
+        },
+        "instanceCodes": [
+          "electrical:im1-054",
+          "external:im2-2"
+        ],
+        "blocks": [
+          {
+            "id": "one",
+            "mainCode": "im1-054",
+            "optionalCodes": [],
+            "loadIndex": "M3PM00400",
+            "warnings": [],
+            "channels": [
+              "01",
+              "T1"
+            ],
+            "specification": [
+              [
+                "GM2L08",
+                1,
+                "шт",
+                "sp4:791"
+              ],
+              [
+                "VEDA 1-2",
+                1,
+                "шт",
+                "sp1:3"
+              ]
+            ],
+            "rules": [
+              [
+                "Выбор основной схемы",
+                "diagram 1:42"
+              ],
+              [
+                "Ручной подбор ЧП",
+                "sp1:3"
+              ]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "automatic-vfd",
+      "motors": [
+        {
+          "id": "one",
+          "tag": "M1",
+          "state": {
+            "selected": {
+              "Ques 1:Способ пуска / управления двигателем:list": "1.2",
+              "Ques 1:Расположение (ЧП / Симисторный регулятор скорости):list": "2.1",
+              "Ques 1:Способ подбора ЧП:list": "3.1",
+              "Ques 1:Производитель (бренд) / Серия (Тип):list": "4.1",
+              "Ques 1:Номинальное напряжение, В:radio_group": "5.3",
+              "Ques 1:Статус нагрузки:radio_group": "9.1"
+            },
+            "inputs": {
+              "Ques 1:6.3": "3.2",
+              "Ques 1:7.3": "1.5",
+              "Ques 1:8.2": "10"
+            },
+            "checks": {},
+            "uploads": {}
+          }
+        }
+      ],
+      "expected": {
+        "canExport": true,
+        "errors": [],
+        "controllerFamily": "ZENTEC M245",
+        "io": {
+          "DI24-HSC-NPN": 0,
+          "DI24-NPN": 0,
+          "DI24-PNP": 1,
+          "DOT-PNP": 1,
+          "DOR-NO": 0,
+          "AI-RTD2": 0,
+          "AI-I0_20-PAS": 0,
+          "AI-I4_20-PAS": 0,
+          "AI-U0_10": 0,
+          "AO-U0_10": 0,
+          "RS-485": 0
+        },
+        "instanceCodes": [
+          "electrical:im1-054",
+          "external:im2-2"
+        ],
+        "blocks": [
+          {
+            "id": "one",
+            "mainCode": "im1-054",
+            "optionalCodes": [],
+            "loadIndex": "M3PM00400",
+            "warnings": [],
+            "channels": [
+              "01",
+              "T1"
+            ],
+            "specification": [
+              [
+                "GM2L08",
+                1,
+                "шт",
+                "sp4:791"
+              ],
+              [
+                "VEDA 1-2",
+                1,
+                "шт",
+                "sp2:7"
+              ]
+            ],
+            "rules": [
+              [
+                "Выбор основной схемы",
+                "diagram 1:42"
+              ],
+              [
+                "Автоматический подбор ЧП",
+                "Load index 2:7"
+              ]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "two-repeated-sensor-motors",
+      "motors": [
+        {
+          "id": "one",
+          "tag": "M1",
+          "state": {
+            "selected": {
+              "Ques 1:Способ пуска / управления двигателем:list": "1.1",
+              "Ques 1:Номинальное напряжение, В:radio_group": "5.1",
+              "Ques 1:Тип защиты автоматического выключателя:radio_group": "15.1",
+              "Ques 1:Статус нагрузки:radio_group": "9.1",
+              "Ques 1:Тип технологического устройства:list": "11.2",
+              "Ques 2:Схема подключения Pt100_Датчик температуры обмотки Pt100:list": "33.1"
+            },
+            "inputs": {
+              "Ques 1:6.1": "0.1",
+              "Ques 1:7.1": "0.01",
+              "Ques 1:10.1": "M1",
+              "Ques 1:10.2": "M1",
+              "Ques 2:34.1": "3"
+            },
+            "checks": {
+              "Ques 1:14.1": true,
+              "Ques 2:30.1": true,
+              "Ques 2:31.1": false,
+              "Ques 2:32.1": true,
+              "Ques 2:35.1": false
+            },
+            "uploads": {}
+          }
+        },
+        {
+          "id": "two",
+          "tag": "M2",
+          "state": {
+            "selected": {
+              "Ques 1:Способ пуска / управления двигателем:list": "1.1",
+              "Ques 1:Номинальное напряжение, В:radio_group": "5.1",
+              "Ques 1:Тип защиты автоматического выключателя:radio_group": "15.1",
+              "Ques 1:Статус нагрузки:radio_group": "9.1",
+              "Ques 1:Тип технологического устройства:list": "11.2",
+              "Ques 2:Схема подключения Pt100_Датчик температуры обмотки Pt100:list": "33.1"
+            },
+            "inputs": {
+              "Ques 1:6.1": "0.1",
+              "Ques 1:7.1": "0.01",
+              "Ques 1:10.1": "M1",
+              "Ques 1:10.2": "M1",
+              "Ques 2:34.1": "3"
+            },
+            "checks": {
+              "Ques 1:14.1": true,
+              "Ques 2:30.1": true,
+              "Ques 2:31.1": false,
+              "Ques 2:32.1": true,
+              "Ques 2:35.1": false
+            },
+            "uploads": {}
+          }
+        }
+      ],
+      "expected": {
+        "canExport": true,
+        "errors": [],
+        "controllerFamily": "ZENTEC M245",
+        "io": {
+          "DI24-HSC-NPN": 0,
+          "DI24-NPN": 0,
+          "DI24-PNP": 4,
+          "DOT-PNP": 2,
+          "DOR-NO": 0,
+          "AI-RTD2": 6,
+          "AI-I0_20-PAS": 0,
+          "AI-I4_20-PAS": 0,
+          "AI-U0_10": 0,
+          "AO-U0_10": 0,
+          "RS-485": 0
+        },
+        "instanceCodes": [
+          "count:20",
+          "unique:20"
+        ],
+        "blocks": [
+          {
+            "id": "one",
+            "mainCode": "im1-014",
+            "optionalCodes": [
+              "bm1-012",
+              "pr1-011",
+              "pr1-011",
+              "pr1-011"
+            ],
+            "loadIndex": "M3PT00016",
+            "warnings": [],
+            "channels": [
+              "01",
+              "T1",
+              "02",
+              "13",
+              "14",
+              "15"
+            ],
+            "specificationCount": 8,
+            "ruleCount": 6
+          },
+          {
+            "id": "two",
+            "mainCode": "im1-014",
+            "optionalCodes": [
+              "bm1-012",
+              "pr1-011",
+              "pr1-011",
+              "pr1-011"
+            ],
+            "loadIndex": "M3PT00016",
+            "warnings": [],
+            "channels": [
+              "03",
+              "T2",
+              "04",
+              "16",
+              "17",
+              "18"
+            ],
+            "specificationCount": 8,
+            "ruleCount": 6
+          }
+        ]
+      }
+    },
+    {
+      "id": "incomplete-second-motor",
+      "motors": [
+        {
+          "id": "one",
+          "tag": "M1",
+          "state": {
+            "selected": {
+              "Ques 1:Способ пуска / управления двигателем:list": "1.1",
+              "Ques 1:Номинальное напряжение, В:radio_group": "5.1",
+              "Ques 1:Тип защиты автоматического выключателя:radio_group": "15.1",
+              "Ques 1:Статус нагрузки:radio_group": "9.1",
+              "Ques 1:Тип технологического устройства:list": "11.2"
+            },
+            "inputs": {
+              "Ques 1:6.1": "0.1",
+              "Ques 1:7.1": "0.01",
+              "Ques 1:10.1": "M1",
+              "Ques 1:10.2": "M1"
+            },
+            "checks": {
+              "Ques 1:14.1": false
+            },
+            "uploads": {}
+          }
+        },
+        {
+          "id": "two",
+          "tag": "M2",
+          "state": {
+            "selected": {},
+            "inputs": {},
+            "checks": {},
+            "uploads": {}
+          }
+        }
+      ],
+      "expected": {
+        "canExport": false,
+        "errors": [
+          "M2: Способ пуска / управления двигателем"
+        ],
+        "controllerFamily": "ZENTEC M245",
+        "io": {
+          "DI24-HSC-NPN": 0,
+          "DI24-NPN": 0,
+          "DI24-PNP": 1,
+          "DOT-PNP": 1,
+          "DOR-NO": 0,
+          "AI-RTD2": 0,
+          "AI-I0_20-PAS": 0,
+          "AI-I4_20-PAS": 0,
+          "AI-U0_10": 0,
+          "AO-U0_10": 0,
+          "RS-485": 0
+        },
+        "instanceCodes": [
+          "electrical:im1-014",
+          "external:im2-1"
+        ],
+        "blocks": [
+          {
+            "id": "one",
+            "mainCode": "im1-014",
+            "optionalCodes": [],
+            "loadIndex": "M3PT00016",
+            "warnings": [],
+            "channels": [
+              "01",
+              "T1"
+            ],
+            "specification": [
+              [
+                "GM2P01 (GV2P01)",
+                1,
+                "шт",
+                "sp4:719"
+              ]
+            ],
+            "rules": [
+              [
+                "Выбор основной схемы",
+                "diagram 1:38"
+              ],
+              [
+                "Подбор индекса нагрузки",
+                "Load index 1:2"
+              ]
+            ]
+          },
+          {
+            "id": "two",
+            "mainCode": null,
+            "optionalCodes": [],
+            "loadIndex": null,
+            "warnings": [],
+            "channels": [],
+            "specification": [],
+            "rules": []
+          }
+        ]
+      }
+    }
+  ],
+  "questionnaireCases": [
+    {
+      "id": "manual-vfd-visible-branch",
+      "sourceCase": "manual-vfd",
+      "visibleOrders": [
+        "1.1",
+        "2.1",
+        "3.1",
+        "5.3",
+        "6.3",
+        "7.3",
+        "9.1",
+        "10.1",
+        "10.2",
+        "11.1",
+        "20.1",
+        "21.1"
+      ],
+      "inputRules": {
+        "6.3": "float|0.1..162.0|0.1",
+        "7.3": "float|0.01..90.00|0.01"
+      }
+    },
+    {
+      "id": "automatic-vfd-visible-branch",
+      "sourceCase": "automatic-vfd",
+      "visibleOrders": [
+        "1.1",
+        "2.1",
+        "3.1",
+        "4.1",
+        "5.3",
+        "6.3",
+        "7.3",
+        "8.2",
+        "9.1",
+        "10.1",
+        "10.2",
+        "11.1"
+      ],
+      "inputRules": {
+        "6.3": "float|0.1..162.0|0.1",
+        "8.2": "float|0.0..30.0|0.1"
+      }
+    }
+  ]
+}

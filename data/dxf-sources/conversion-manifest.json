@@ -1,0 +1,1043 @@
+{
+  "converter": "AutoCAD Core Console",
+  "targetFormat": "AutoCAD 2018 ASCII DXF",
+  "converted": [
+    {
+      "code": "bm1-011",
+      "sourceSha256": "efeb0a92c77d8432cd75c2c7195d5f60ca9642340cdca208499166b3ed183a89",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 273670,
+        "sha256": "20dba72d5ca404cf1e4d92a40bdccfd68282b85ec66551ce6044d2e26503a89a",
+        "entityCount": 110,
+        "auditErrors": 0,
+        "extents": [
+          4480.733,
+          5944.305,
+          4536.744,
+          6149.179
+        ]
+      }
+    },
+    {
+      "code": "bm1-012",
+      "sourceSha256": "346823fb00afce8f8319afa2dd17b1195f278d42aca7b64f25aff8e9445f4df8",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 241926,
+        "sha256": "6632549d87f158e0d42912ace41deb412248028378075167fadabbfcfcd9afd1",
+        "entityCount": 36,
+        "auditErrors": 0,
+        "extents": [
+          4476.583,
+          5944.305,
+          4505.813,
+          6149.179
+        ]
+      }
+    },
+    {
+      "code": "bm2-1",
+      "sourceSha256": "fd516477730c1fd38235fae236173aa7567d91615bf51ff190c00e4e9940a3c6",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 252319,
+        "sha256": "a4c97df18919d292ce7426a33aae8ae58d79a815fcb30b065f5718c23fc68437",
+        "entityCount": 61,
+        "auditErrors": 0,
+        "extents": [
+          4483.148,
+          5947.148,
+          4595.759,
+          6147.295
+        ]
+      }
+    },
+    {
+      "code": "im1-011",
+      "sourceSha256": "f5a4a7fed2404b6d4ac3304582ce74a82c4c1cfda194b5bc4cd0bccda4940cb3",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 272172,
+        "sha256": "e09d4e35540f9c05952d914eb5341ff103f5feac0575c12357b5e5a0461cec7a",
+        "entityCount": 112,
+        "auditErrors": 0,
+        "extents": [
+          4480.733,
+          5944.305,
+          4536.744,
+          6149.179
+        ]
+      }
+    },
+    {
+      "code": "im1-012",
+      "sourceSha256": "466bf616f70c6a8d5d9751b619bb6e1a841b5bd135f2a3c31ac55f38c740903c",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 272172,
+        "sha256": "37bb6837faeadc60d5b632630e8e2313344e9a657a8dd58de66c455066a90fae",
+        "entityCount": 112,
+        "auditErrors": 0,
+        "extents": [
+          4480.733,
+          5944.305,
+          4536.744,
+          6149.179
+        ]
+      }
+    },
+    {
+      "code": "im1-013",
+      "sourceSha256": "4f3ebe3bfb3091b30b435d73776a0a1282b89490814133a93bc95a4e4330f015",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 272172,
+        "sha256": "34823c1df625abbdb27b359848f639c26e391b3dae768c049879417738257ee5",
+        "entityCount": 112,
+        "auditErrors": 0,
+        "extents": [
+          4480.733,
+          5944.305,
+          4536.744,
+          6149.179
+        ]
+      }
+    },
+    {
+      "code": "im1-014",
+      "sourceSha256": "8e14c8c84cc12c429b3138b557652cbf297255c817fe10c0c2a5488205fd5efc",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 272172,
+        "sha256": "e97cded9cbf2a5e0b75c937721ef80dab34ef95f5a2bff44330b9c8db2229ba2",
+        "entityCount": 112,
+        "auditErrors": 0,
+        "extents": [
+          4480.733,
+          5944.305,
+          4536.744,
+          6149.179
+        ]
+      }
+    },
+    {
+      "code": "im1-021",
+      "sourceSha256": "2a0bc9f38baac1f5cf57a280c3327c232b8ceb522bf813672c29b255c2506289",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 268322,
+        "sha256": "cd432591e7ab74801580157bc5a171dbf3d5058ad397d7074c5be2fed8a63331",
+        "entityCount": 94,
+        "auditErrors": 0,
+        "extents": [
+          4474.212,
+          5944.305,
+          4536.744,
+          6149.179
+        ]
+      }
+    },
+    {
+      "code": "im1-022",
+      "sourceSha256": "d1252ca725d8b18357e5de4d5468bf40a8432eb287d8f74452571049fea4f512",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 268322,
+        "sha256": "fc228743e3cb46826a8a2a06b52d99e0ef324f8de25a4097a3a18835e289c4ba",
+        "entityCount": 94,
+        "auditErrors": 0,
+        "extents": [
+          4474.212,
+          5944.305,
+          4536.744,
+          6149.179
+        ]
+      }
+    },
+    {
+      "code": "im1-023",
+      "sourceSha256": "3079518e622f938555bf36406e3704e78ae31a3d8cfd8782c5dff4d57652f77a",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 268322,
+        "sha256": "d70250760a63d2e8ac18109cebe4bacd0db3c58d1cf7b2b689c910937280b067",
+        "entityCount": 94,
+        "auditErrors": 0,
+        "extents": [
+          4474.212,
+          5944.305,
+          4536.744,
+          6149.179
+        ]
+      }
+    },
+    {
+      "code": "im1-024",
+      "sourceSha256": "5908f87b602e4fb78c906847f779e9733629c9c3c7051b0db8c750850a29e9e5",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 268322,
+        "sha256": "e9ad9e916d48e8479c5f3046959967e4df53f8782c26c433e56687ce8e6a9567",
+        "entityCount": 94,
+        "auditErrors": 0,
+        "extents": [
+          4474.212,
+          5944.305,
+          4536.744,
+          6149.179
+        ]
+      }
+    },
+    {
+      "code": "im1-031",
+      "sourceSha256": "9c49921ae472959a513c9b69974c339d00e9cdf4715ead7d0b50a8251ae958f8",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 273670,
+        "sha256": "85dca02b7d54425cdde2797eff76078eeff91634780adc2b77019798fd283faf",
+        "entityCount": 110,
+        "auditErrors": 0,
+        "extents": [
+          4480.733,
+          5944.305,
+          4536.744,
+          6149.179
+        ]
+      }
+    },
+    {
+      "code": "im1-032",
+      "sourceSha256": "c1d327a86514a2a4b2bb64307096a6eb0e91230f4e5672b5be2e87a2c11b1e89",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 273670,
+        "sha256": "6aea8613f077d4ddbaedfe5426332c673f2cd2afa149998d2b44f379ab3e6fac",
+        "entityCount": 110,
+        "auditErrors": 0,
+        "extents": [
+          4480.733,
+          5944.305,
+          4536.744,
+          6149.179
+        ]
+      }
+    },
+    {
+      "code": "im1-033",
+      "sourceSha256": "ab722f77ee1585a691759330f207f72bf160ce94788676311cf8056915d26818",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 273670,
+        "sha256": "f44f2857f90f713326ba79d9889e65047ed12bfd004e4ddb77c3e65e519152b7",
+        "entityCount": 110,
+        "auditErrors": 0,
+        "extents": [
+          4480.733,
+          5944.305,
+          4536.744,
+          6149.179
+        ]
+      }
+    },
+    {
+      "code": "im1-034",
+      "sourceSha256": "d0e7627392ee7274b0612d4a37d74613bf1dd53972ff18c74693e305254e0381",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 273670,
+        "sha256": "afba385786086f1fb6fbfa4aa2b790bbfe8b66f33471197d997ead45bbbd28b0",
+        "entityCount": 110,
+        "auditErrors": 0,
+        "extents": [
+          4480.733,
+          5944.305,
+          4536.744,
+          6149.179
+        ]
+      }
+    },
+    {
+      "code": "im1-041",
+      "sourceSha256": "5fddf0821b566b8b7e64e0e13fa06d88a5beab71f24e679ac593d8a6add41b9e",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 271817,
+        "sha256": "493ab5888432632bebbb5228044f1cd94a33c4742231e3313d5981e7b4b99293",
+        "entityCount": 101,
+        "auditErrors": 0,
+        "extents": [
+          4480.733,
+          5944.305,
+          4536.744,
+          6149.179
+        ]
+      }
+    },
+    {
+      "code": "im1-042",
+      "sourceSha256": "564dd3a085a08972599066b17aebeec31904874bcccc070c6203026fc79703a7",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 271817,
+        "sha256": "c1522d70d0b038057c83985d7dac0670e5c7bd16047a847ac764a1489ae16c90",
+        "entityCount": 101,
+        "auditErrors": 0,
+        "extents": [
+          4480.733,
+          5944.305,
+          4536.744,
+          6149.179
+        ]
+      }
+    },
+    {
+      "code": "im1-043",
+      "sourceSha256": "bac6b0977695c3fce93bda0f381cb27f827ebe415628f86fd71d735ea11c5104",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 271817,
+        "sha256": "aabe1b6f93e63f9ea5a3fd8b789f2f6ce9ce99d6316347c8e6c7e84c871a2786",
+        "entityCount": 101,
+        "auditErrors": 0,
+        "extents": [
+          4480.733,
+          5944.305,
+          4536.744,
+          6149.179
+        ]
+      }
+    },
+    {
+      "code": "im1-044",
+      "sourceSha256": "c29854d13be9fb5c94c5fddad3bf0e3fbad823fa27fed6a5d1d49be8be3e1d95",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 271817,
+        "sha256": "2d5d5420f3e6c1499bf0ef3cba51c9773134c3c48ef26f316d600cd3c8abc128",
+        "entityCount": 101,
+        "auditErrors": 0,
+        "extents": [
+          4480.733,
+          5944.305,
+          4536.744,
+          6149.179
+        ]
+      }
+    },
+    {
+      "code": "im1-051",
+      "sourceSha256": "fb509f35ea80d6bfb8719b153ab4faac02af5cefbd5c8000e5ef0134cd97f7f5",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 281467,
+        "sha256": "b71e6a9228b18d71c9dbd05eb06b84ce907a7168827796fa54ffdff661fefc08",
+        "entityCount": 125,
+        "auditErrors": 0,
+        "extents": [
+          4480.335,
+          5944.305,
+          4546.744,
+          6149.179
+        ]
+      }
+    },
+    {
+      "code": "im1-052",
+      "sourceSha256": "e24c5d61420b0527f8b32fc6d1ec21cec7e972fb1dd0cd42be0fe19c8ae855fb",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 281467,
+        "sha256": "548b16d035a98a6f8d9235dfb7720c309b80dd8f9f2e219ca9ce29fbc122f363",
+        "entityCount": 125,
+        "auditErrors": 0,
+        "extents": [
+          4480.335,
+          5944.305,
+          4546.744,
+          6149.179
+        ]
+      }
+    },
+    {
+      "code": "im1-053",
+      "sourceSha256": "901f044995f6a7b582e8ef1b7c58b7249fb9a5571b691a797d210a04ca1e08c5",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 281467,
+        "sha256": "fcaddb7a5ea88236ec8c0a2a701d21a7ba1a1475db46e1838bdd14b2dbd7337a",
+        "entityCount": 125,
+        "auditErrors": 0,
+        "extents": [
+          4480.335,
+          5944.305,
+          4546.744,
+          6149.179
+        ]
+      }
+    },
+    {
+      "code": "im1-054",
+      "sourceSha256": "a1f2cacfbbe1265115c5708e08492df9467090d37a053e29d48e537b76f9ba89",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 281467,
+        "sha256": "d620309bfaedeb1b3d1ab93e5e9a25173081ee27422d51614082165a60ca773f",
+        "entityCount": 125,
+        "auditErrors": 0,
+        "extents": [
+          4480.335,
+          5944.305,
+          4546.744,
+          6149.179
+        ]
+      }
+    },
+    {
+      "code": "im1-061",
+      "sourceSha256": "96e0f354759cb592ac9fcfc0cdd2f8fe00f6098ffbfe81c4d4a80fbb2bc82d58",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 274726,
+        "sha256": "a83a5f4dff304b8b1c274bcfdd3c511765a6b084d90fa995ecc278f8dfee8053",
+        "entityCount": 110,
+        "auditErrors": 0,
+        "extents": [
+          4480.733,
+          5944.305,
+          4546.744,
+          6149.179
+        ]
+      }
+    },
+    {
+      "code": "im1-062",
+      "sourceSha256": "b7775a45ed78b498b971682e91a9ecdb9e8fcc86c92a73a08ee75ab22d99cbe0",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 274726,
+        "sha256": "ec81716dd285f8e462124b017355b63898735df4577c6c6d223edbfdafbb4825",
+        "entityCount": 110,
+        "auditErrors": 0,
+        "extents": [
+          4480.733,
+          5944.305,
+          4546.744,
+          6149.179
+        ]
+      }
+    },
+    {
+      "code": "im1-063",
+      "sourceSha256": "de6bd41e7ec63192f142c4254d3bf775f001e0216a0d8cdf9b3776ea2e82c099",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 274726,
+        "sha256": "b50082912e1fed2eab4cfaaa32d9a017b0eb2badb6c5cd86a26ab0fafeb74082",
+        "entityCount": 110,
+        "auditErrors": 0,
+        "extents": [
+          4480.733,
+          5944.305,
+          4546.744,
+          6149.179
+        ]
+      }
+    },
+    {
+      "code": "im1-064",
+      "sourceSha256": "7699788e7f89847400c9af7295dae79aa6186c9d692054bae46f3abade5618b0",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 274726,
+        "sha256": "1fde675c023a91b66422bccc02e80982aa8cccc82e9efeb419e6665baed7108f",
+        "entityCount": 110,
+        "auditErrors": 0,
+        "extents": [
+          4480.733,
+          5944.305,
+          4546.744,
+          6149.179
+        ]
+      }
+    },
+    {
+      "code": "im1-071",
+      "sourceSha256": "d792d01003eea9aeccd69f1c2a8bd6f7d079ca356bba5ab198bf0af47498a749",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 283928,
+        "sha256": "b380ce814ecffe07b66167b7ba5977da5779d6253a83e233bd4054d26b70678d",
+        "entityCount": 135,
+        "auditErrors": 0,
+        "extents": [
+          4480.335,
+          5944.305,
+          4546.744,
+          6149.179
+        ]
+      }
+    },
+    {
+      "code": "im1-072",
+      "sourceSha256": "df563d6545ca004ad0b32a44a26f8b91c91b2f187c9e3c8b044dc5208b213dac",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 283928,
+        "sha256": "dec0bc0e6d530bc084be2ed193c6fcfb401d80645c2003af9cd592207f4ea012",
+        "entityCount": 135,
+        "auditErrors": 0,
+        "extents": [
+          4480.335,
+          5944.305,
+          4546.744,
+          6149.179
+        ]
+      }
+    },
+    {
+      "code": "im1-073",
+      "sourceSha256": "38efcc87a60d94f441247fac19d41e876d14e72617433dd0e06f237f9f1446e6",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 283928,
+        "sha256": "e9cf82bea4bc31c2e00efc34fa1436a28e41b110bec0c806047925a0c5bb0ddc",
+        "entityCount": 135,
+        "auditErrors": 0,
+        "extents": [
+          4480.335,
+          5944.305,
+          4546.744,
+          6149.179
+        ]
+      }
+    },
+    {
+      "code": "im1-074",
+      "sourceSha256": "814230d5fb4eb1d2d141fc49c1b2dd80a461d23c56a39173d64bc17763fa11e6",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 283928,
+        "sha256": "466837acb13e787bdfbada7a35d4db7c31e662cc765f3a386d640aa573d22e3f",
+        "entityCount": 135,
+        "auditErrors": 0,
+        "extents": [
+          4480.335,
+          5944.305,
+          4546.744,
+          6149.179
+        ]
+      }
+    },
+    {
+      "code": "im1-081",
+      "sourceSha256": "cfc08706eb8ef7dfe5089eb280f9caf24bcace4fd80eececf2d86f6db3115b59",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 282050,
+        "sha256": "dd833a53d0efc74f1d24ddf101a7f8f8d8a0c731f8c96c483c1f97c78d186f66",
+        "entityCount": 126,
+        "auditErrors": 0,
+        "extents": [
+          4480.335,
+          5944.305,
+          4546.744,
+          6149.179
+        ]
+      }
+    },
+    {
+      "code": "im1-082",
+      "sourceSha256": "15eadb23077ae62251b8ed460779dd5ae2c3dcdb8fc26c4d92b8641b95cf9546",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 282050,
+        "sha256": "d75b16e8df0c3e8f925986f90fc29faca09afa32b85f7a4f0d0def24699160c0",
+        "entityCount": 126,
+        "auditErrors": 0,
+        "extents": [
+          4480.335,
+          5944.305,
+          4546.744,
+          6149.179
+        ]
+      }
+    },
+    {
+      "code": "im1-083",
+      "sourceSha256": "66b4d45757535e919b99786be17cb6ba24190f00f5d922d4ab635d1e670da083",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 282050,
+        "sha256": "3a0b28978efcd9aff011a4a365b8c0803333b562a3f2235ada916ad2d3ad3a70",
+        "entityCount": 126,
+        "auditErrors": 0,
+        "extents": [
+          4480.335,
+          5944.305,
+          4546.744,
+          6149.179
+        ]
+      }
+    },
+    {
+      "code": "im1-084",
+      "sourceSha256": "cdc8cc41262a64ab3aacfe11e3fe2c0d06f8d93a3d70c4441055a2db22db5ebb",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 282050,
+        "sha256": "9c84e581b11f83795f2978b035407b9cb37902fb95c8a9f6a5e9ba1c694ba82f",
+        "entityCount": 126,
+        "auditErrors": 0,
+        "extents": [
+          4480.335,
+          5944.305,
+          4546.744,
+          6149.179
+        ]
+      }
+    },
+    {
+      "code": "im1-091",
+      "sourceSha256": "9b04b37da189d62f412c22c8c72b8d67f79c503b7ef57c812cb9ca4943c09ee4",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 287459,
+        "sha256": "bd80d4ee7d039c3010877f444d50793c31bfde273eec86ad9f47ff42a9c51dba",
+        "entityCount": 143,
+        "auditErrors": 0,
+        "extents": [
+          4472.918,
+          5944.305,
+          4557.14,
+          6149.179
+        ]
+      }
+    },
+    {
+      "code": "im1-092",
+      "sourceSha256": "6b59f3c4241da6450152db689b835a131d107d9823aaab4d8ea404b495008ce0",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 287459,
+        "sha256": "5d1b3139ad49137dd6c1fc89769b3e8809416265c6e65ac0bb91e8b4d7268c77",
+        "entityCount": 143,
+        "auditErrors": 0,
+        "extents": [
+          4472.918,
+          5944.305,
+          4557.14,
+          6149.179
+        ]
+      }
+    },
+    {
+      "code": "im1-093",
+      "sourceSha256": "be0c81f4dd646ad19d0a844a8081b631a4abc399afd5d3a177178203704915a9",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 287459,
+        "sha256": "32b96d7ea54efac8983e6ec347c9d85bd41e3255d08c0bc240e3912f10ddc574",
+        "entityCount": 143,
+        "auditErrors": 0,
+        "extents": [
+          4472.918,
+          5944.305,
+          4557.14,
+          6149.179
+        ]
+      }
+    },
+    {
+      "code": "im1-094",
+      "sourceSha256": "7952e8ae1a0dfb95274391410f6407ba3b3e740e710eef81f7ece2cd86e364c1",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 287459,
+        "sha256": "dcd15662e8873015f4aec895edf31de05902ca1dfe638238182183c3e48691dc",
+        "entityCount": 143,
+        "auditErrors": 0,
+        "extents": [
+          4472.918,
+          5944.305,
+          4557.14,
+          6149.179
+        ]
+      }
+    },
+    {
+      "code": "im1-101",
+      "sourceSha256": "1e13c0e11042987b9726668e483aa91b1b7b5b6bc24014795ecfdb1abdf72232",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 285520,
+        "sha256": "dadae05aaaf448c7d6fd4d4b16a1b6863cccfb6b80adec27fb94c2e18bfd6373",
+        "entityCount": 134,
+        "auditErrors": 0,
+        "extents": [
+          4472.918,
+          5944.305,
+          4557.14,
+          6149.179
+        ]
+      }
+    },
+    {
+      "code": "im1-102",
+      "sourceSha256": "5429ad87b711f350b7e666316dc9c897a50d98d8e41e2f1ab4a8c78b5b1a2158",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 285548,
+        "sha256": "6faee4177631df01c55b1417ad9cd48f43a1a8bf670c370aaea9ea910403581a",
+        "entityCount": 134,
+        "auditErrors": 0,
+        "extents": [
+          4472.918,
+          5944.305,
+          4557.14,
+          6149.179
+        ]
+      }
+    },
+    {
+      "code": "im1-103",
+      "sourceSha256": "9c1778bcaa8732037b055cdf71d694abe77fadeb7480e22e896bc30789483696",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 285548,
+        "sha256": "66e3b181890ffe89b7b2f1a1d0c5a535c5aced203c41824ba5379228b9dc2886",
+        "entityCount": 134,
+        "auditErrors": 0,
+        "extents": [
+          4472.918,
+          5944.305,
+          4557.14,
+          6149.179
+        ]
+      }
+    },
+    {
+      "code": "im1-104",
+      "sourceSha256": "68b8e59758371f9f442c317bf779b57003e977c43c1a66b64c4d3e750c74a9f3",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 285548,
+        "sha256": "5bf483dc82fd5ae25e6b2b5589d2e610034bd4e2f2bf6f6b123d00effdde30da",
+        "entityCount": 134,
+        "auditErrors": 0,
+        "extents": [
+          4472.918,
+          5944.305,
+          4557.14,
+          6149.179
+        ]
+      }
+    },
+    {
+      "code": "im1-111",
+      "sourceSha256": "bfc8510af54ea5d1d6ca7c64a46223c43425e4e5bf1758e0b4ac011c80fda416",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 277281,
+        "sha256": "a77a52d3dbeb634149d21d1da0ed3c458339385f71c9b6484074bd3cf2fd49c8",
+        "entityCount": 124,
+        "auditErrors": 0,
+        "extents": [
+          4475.625,
+          5944.305,
+          4536.744,
+          6149.179
+        ]
+      }
+    },
+    {
+      "code": "im1-112",
+      "sourceSha256": "7f3b86ed4dfa8afe526db220d398d36805a1cc3c2034acf708fe55386fc216b1",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 277305,
+        "sha256": "2e172a6ab8e3b845ac4dfe8fdc1b29652c0a314a45183d5cc71554b0c569abd0",
+        "entityCount": 124,
+        "auditErrors": 0,
+        "extents": [
+          4475.625,
+          5944.305,
+          4536.744,
+          6149.179
+        ]
+      }
+    },
+    {
+      "code": "im1-113",
+      "sourceSha256": "d23d70e686d649d3456ebab28cf02a8199c8ef82bdf824c12bc1d33271e10b20",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 277305,
+        "sha256": "8e6ba9861bff12bc79e01aa7b09e8cacfca398ca5fe0270deeea8d3aa4734772",
+        "entityCount": 124,
+        "auditErrors": 0,
+        "extents": [
+          4475.625,
+          5944.305,
+          4536.744,
+          6149.179
+        ]
+      }
+    },
+    {
+      "code": "im1-114",
+      "sourceSha256": "380139e4416e23e1b4574210afdd44c69a9d129726047a7a5a451ac0d6209824",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 277305,
+        "sha256": "f1be157321f845c93d109044a7999acc32e61dbcfb41115d45828223b628c59a",
+        "entityCount": 124,
+        "auditErrors": 0,
+        "extents": [
+          4475.625,
+          5944.305,
+          4536.744,
+          6149.179
+        ]
+      }
+    },
+    {
+      "code": "im1-121",
+      "sourceSha256": "41e928d950884771846835655fad6274f8ad25a7e3d88ddb3828bada93117f68",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 275369,
+        "sha256": "a04a790163689ea13182451ba35542dbeec2bdaa697d61c87b369aec1121b3b4",
+        "entityCount": 115,
+        "auditErrors": 0,
+        "extents": [
+          4475.625,
+          5944.305,
+          4536.744,
+          6149.179
+        ]
+      }
+    },
+    {
+      "code": "im1-122",
+      "sourceSha256": "7d1e83fe6a6543212d03c6db2aa078e807e4ec94c360069b7a4fa50f7005c558",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 275369,
+        "sha256": "721485530bbc421a866f073039dca780a0031e59cb0c7ea48a8c591a6ef2620f",
+        "entityCount": 115,
+        "auditErrors": 0,
+        "extents": [
+          4475.625,
+          5944.305,
+          4536.744,
+          6149.179
+        ]
+      }
+    },
+    {
+      "code": "im1-123",
+      "sourceSha256": "99b0c520a614d491a7613ed5f2466f7880d91198f2615121380d530f4baceec3",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 275369,
+        "sha256": "2eab80bc005cbdd5e9f7c164a49c703666f332e3c3e39b195a472084fce33b4d",
+        "entityCount": 115,
+        "auditErrors": 0,
+        "extents": [
+          4475.625,
+          5944.305,
+          4536.744,
+          6149.179
+        ]
+      }
+    },
+    {
+      "code": "im1-124",
+      "sourceSha256": "f301ff3145a2f254387410c39f0b741304375431252e6d0594f735496a9b44e2",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 275369,
+        "sha256": "8571c01dc52e3132560d4a411ec96ac57d40e324381bef40f6c0d484712e074e",
+        "entityCount": 115,
+        "auditErrors": 0,
+        "extents": [
+          4475.625,
+          5944.305,
+          4536.744,
+          6149.179
+        ]
+      }
+    },
+    {
+      "code": "im2-1",
+      "sourceSha256": "928631a5e83175233fca4c71a3e9f34228e508a6192757e46883347bc6795a53",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 255029,
+        "sha256": "2171bbfa387485249c98684f43ad485ab4823331742dfeecb0cf162c062ea4c3",
+        "entityCount": 67,
+        "auditErrors": 0,
+        "extents": [
+          4483.148,
+          5947.148,
+          4607.211,
+          6147.295
+        ]
+      }
+    },
+    {
+      "code": "im2-2",
+      "sourceSha256": "58cee9de6290200bbfb42ce5bec4599f7aaee5532a5420876ed1b577f5c3a993",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 257994,
+        "sha256": "135d17e8fddf46d18d22f9dd4763007f6f7db734638627767c6d2a12fb43854f",
+        "entityCount": 74,
+        "auditErrors": 0,
+        "extents": [
+          4483.148,
+          5947.148,
+          4607.211,
+          6147.295
+        ]
+      }
+    },
+    {
+      "code": "im2-3",
+      "sourceSha256": "afb419e6d4f741e8c13454bac5b36a511755ad14c953d1840ea2319c41c60d62",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 268452,
+        "sha256": "15241649a602e9672b5a1336e988f704dc0419094c5be71263689b88aee41482",
+        "entityCount": 99,
+        "auditErrors": 0,
+        "extents": [
+          4483.148,
+          5947.148,
+          4629.276,
+          6147.295
+        ]
+      }
+    },
+    {
+      "code": "im2-4",
+      "sourceSha256": "1abde52ec805997a39f5ce295a65e22789aa6bba6e5bc81676407f87ddd2551a",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 270831,
+        "sha256": "800f9f5e20fed9c0e2f91ac4b8c6867ee27b04e80c3095e1a3303de601b6ff49",
+        "entityCount": 103,
+        "auditErrors": 0,
+        "extents": [
+          4483.148,
+          5947.148,
+          4629.276,
+          6147.295
+        ]
+      }
+    },
+    {
+      "code": "pr1-011",
+      "sourceSha256": "29b6537d7bd9f6b4a991738a6d40a7c49ba5445ca25720890a9b6688d5782d7d",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 247521,
+        "sha256": "4d709650ab1403f00a9f6599e4330154437425bbc89fce43f74605940f8755af",
+        "entityCount": 41,
+        "auditErrors": 0,
+        "extents": [
+          4476.583,
+          5944.305,
+          4505.813,
+          6149.179
+        ]
+      }
+    },
+    {
+      "code": "pr1-021",
+      "sourceSha256": "10f062b1df96b66b26645f59ab0ae5db496d65dc56b201ded138c17016690e99",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 249769,
+        "sha256": "1a8f6285ff0d204c85d1ec8e7fc038f01fbfe77e559693de89348de6897a6f35",
+        "entityCount": 47,
+        "auditErrors": 0,
+        "extents": [
+          4476.583,
+          5944.305,
+          4505.813,
+          6149.179
+        ]
+      }
+    },
+    {
+      "code": "pr1-031",
+      "sourceSha256": "759499003434671091f10719dc98b900cf50100d8820e7526c33b8042f091708",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 252012,
+        "sha256": "75e1b0d35f909b67a69ee5b03fb6aa98aa6f2ee97b2e124a1c523eddb3920465",
+        "entityCount": 53,
+        "auditErrors": 0,
+        "extents": [
+          4480.733,
+          5944.305,
+          4507.599,
+          6149.179
+        ]
+      }
+    },
+    {
+      "code": "pr2-1",
+      "sourceSha256": "45021f4b10b4b5073501925a55b42208c2a98f346251e4618147a7879fd91277",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 255131,
+        "sha256": "e84a7de859cc7b194384ef931b2556070f8c974662a1f12e64f46aa94116c47c",
+        "entityCount": 71,
+        "auditErrors": 0,
+        "extents": [
+          4483.148,
+          5947.148,
+          4595.759,
+          6147.295
+        ]
+      }
+    },
+    {
+      "code": "pr2-2",
+      "sourceSha256": "e3ec23f068167320cfb6ad1cbcf96633f23cfc63f087ea147a577b8cb55ee05c",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 259303,
+        "sha256": "2629df8f4806f6d63a45241a48301574d78bc1890b09414d426858116d2141e4",
+        "entityCount": 82,
+        "auditErrors": 0,
+        "extents": [
+          4483.148,
+          5947.148,
+          4595.759,
+          6147.295
+        ]
+      }
+    },
+    {
+      "code": "pr2-3",
+      "sourceSha256": "24fae258b2a579229de6142f72cfe511a829ec611be77b1ee48bfa819d708954",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 263479,
+        "sha256": "c7fde237f0406be95e718ee332747404a4f751476562a2acf9e91d9d9675447b",
+        "entityCount": 93,
+        "auditErrors": 0,
+        "extents": [
+          4483.148,
+          5947.148,
+          4595.759,
+          6147.295
+        ]
+      }
+    }
+  ]
+}

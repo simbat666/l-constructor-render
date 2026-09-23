@@ -1,0 +1,39 @@
+{
+  "archive": "Схемы.zip",
+  "converted": [
+    {
+      "code": "sheet-1-1",
+      "sourceSha256": "dfefa8a6b06a15bc8edb4a06582e47fa2974b1e21587e0819f50a3fcbc342696",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 243360,
+        "sha256": "1efdc7815efff72d6649344b88fa6fc8e5df7f8e49fa544f18779f11215efa46",
+        "entityCount": 43,
+        "auditErrors": 0,
+        "extents": [
+          4432.996,
+          5888.25,
+          4853.009,
+          6185.25
+        ]
+      }
+    },
+    {
+      "code": "sheet-1-2",
+      "sourceSha256": "b61fb72ddc3cbe6c2709621d967799b268270254b7b4d16d14a00daef457f50a",
+      "output": {
+        "dxfVersion": "AC1032",
+        "bytes": 235581,
+        "sha256": "d6bee56731e3f399d01458f2433c342b3833acd5fe25d28eadb2856e3f582b1e",
+        "entityCount": 26,
+        "auditErrors": 0,
+        "extents": [
+          3761.809,
+          5888.25,
+          4505.813,
+          6185.25
+        ]
+      }
+    }
+  ]
+}

@@ -36,3 +36,14 @@ next-env.d.ts
 /.wrangler/
 /outputs/
 /work/
+/.venv/
+/.cache/
+__pycache__/
+/scripts/node_modules
+/output/generated/
+*.tsbuildinfo
+/data/dxf-frames/*.log
+/data/dxf-frames/logs/
+
+# Local Netlify folder
+.netlify

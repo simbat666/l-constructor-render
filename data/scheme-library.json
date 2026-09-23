@@ -1,0 +1,1258 @@
+{
+  "sourceArchive": "Схемы.zip",
+  "sourceCount": 63,
+  "aliasCount": 1,
+  "requiredCodeCount": 61,
+  "foundCodeCount": 61,
+  "missingCodes": [],
+  "unreferencedDwgCodes": [
+    "Sheet 1.1",
+    "Sheet 1.2"
+  ],
+  "sources": [
+    {
+      "code": "bm1-011",
+      "status": "found",
+      "archiveFile": "bm1-011.dwg",
+      "localFile": "cad-sources/bm1-011.dwg",
+      "alias": null,
+      "bytes": 78469,
+      "sha256": "efeb0a92c77d8432cd75c2c7195d5f60ca9642340cdca208499166b3ed183a89",
+      "uses": [
+        {
+          "sheet": "diagram 2",
+          "sourceRow": 2,
+          "field": "diagram1"
+        }
+      ]
+    },
+    {
+      "code": "bm1-012",
+      "status": "found",
+      "archiveFile": "bm1-012.dwg",
+      "localFile": "cad-sources/bm1-012.dwg",
+      "alias": null,
+      "bytes": 68633,
+      "sha256": "346823fb00afce8f8319afa2dd17b1195f278d42aca7b64f25aff8e9445f4df8",
+      "uses": [
+        {
+          "sheet": "diagram 2",
+          "sourceRow": 3,
+          "field": "diagram1"
+        }
+      ]
+    },
+    {
+      "code": "bm2-1",
+      "status": "found",
+      "archiveFile": "bm2-1.dwg",
+      "localFile": "cad-sources/bm2-1.dwg",
+      "alias": null,
+      "bytes": 71166,
+      "sha256": "fd516477730c1fd38235fae236173aa7567d91615bf51ff190c00e4e9940a3c6",
+      "uses": [
+        {
+          "sheet": "diagram 2",
+          "sourceRow": 2,
+          "field": "diagram2"
+        },
+        {
+          "sheet": "diagram 2",
+          "sourceRow": 3,
+          "field": "diagram2"
+        }
+      ]
+    },
+    {
+      "code": "im1-011",
+      "status": "found",
+      "archiveFile": "im1-011.dwg",
+      "localFile": "cad-sources/im1-011.dwg",
+      "alias": null,
+      "bytes": 79663,
+      "sha256": "f5a4a7fed2404b6d4ac3304582ce74a82c4c1cfda194b5bc4cd0bccda4940cb3",
+      "uses": [
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 2,
+          "field": "diagram1"
+        }
+      ]
+    },
+    {
+      "code": "im1-012",
+      "status": "found",
+      "archiveFile": "im1-012.dwg",
+      "localFile": "cad-sources/im1-012.dwg",
+      "alias": null,
+      "bytes": 79663,
+      "sha256": "466bf616f70c6a8d5d9751b619bb6e1a841b5bd135f2a3c31ac55f38c740903c",
+      "uses": [
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 14,
+          "field": "diagram1"
+        }
+      ]
+    },
+    {
+      "code": "im1-013",
+      "status": "found",
+      "archiveFile": "im1-013.dwg",
+      "localFile": "cad-sources/im1-013.dwg",
+      "alias": null,
+      "bytes": 79663,
+      "sha256": "4f3ebe3bfb3091b30b435d73776a0a1282b89490814133a93bc95a4e4330f015",
+      "uses": [
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 26,
+          "field": "diagram1"
+        }
+      ]
+    },
+    {
+      "code": "im1-014",
+      "status": "found",
+      "archiveFile": "im1-014.dwg",
+      "localFile": "cad-sources/im1-014.dwg",
+      "alias": null,
+      "bytes": 79663,
+      "sha256": "8e14c8c84cc12c429b3138b557652cbf297255c817fe10c0c2a5488205fd5efc",
+      "uses": [
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 38,
+          "field": "diagram1"
+        }
+      ]
+    },
+    {
+      "code": "im1-021",
+      "status": "found",
+      "archiveFile": "im1-021.dwg",
+      "localFile": "cad-sources/im1-021.dwg",
+      "alias": null,
+      "bytes": 78671,
+      "sha256": "2a0bc9f38baac1f5cf57a280c3327c232b8ceb522bf813672c29b255c2506289",
+      "uses": [
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 3,
+          "field": "diagram1"
+        }
+      ]
+    },
+    {
+      "code": "im1-022",
+      "status": "found",
+      "archiveFile": "im1-022.dwg",
+      "localFile": "cad-sources/im1-022.dwg",
+      "alias": null,
+      "bytes": 78671,
+      "sha256": "d1252ca725d8b18357e5de4d5468bf40a8432eb287d8f74452571049fea4f512",
+      "uses": [
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 15,
+          "field": "diagram1"
+        }
+      ]
+    },
+    {
+      "code": "im1-023",
+      "status": "found",
+      "archiveFile": "im1-023.dwg",
+      "localFile": "cad-sources/im1-023.dwg",
+      "alias": null,
+      "bytes": 78671,
+      "sha256": "3079518e622f938555bf36406e3704e78ae31a3d8cfd8782c5dff4d57652f77a",
+      "uses": [
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 27,
+          "field": "diagram1"
+        }
+      ]
+    },
+    {
+      "code": "im1-024",
+      "status": "found",
+      "archiveFile": "im1-024.dwg",
+      "localFile": "cad-sources/im1-024.dwg",
+      "alias": null,
+      "bytes": 78671,
+      "sha256": "5908f87b602e4fb78c906847f779e9733629c9c3c7051b0db8c750850a29e9e5",
+      "uses": [
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 39,
+          "field": "diagram1"
+        }
+      ]
+    },
+    {
+      "code": "im1-031",
+      "status": "found",
+      "archiveFile": "im1-031.dwg",
+      "localFile": "cad-sources/im1-031.dwg",
+      "alias": null,
+      "bytes": 78469,
+      "sha256": "9c49921ae472959a513c9b69974c339d00e9cdf4715ead7d0b50a8251ae958f8",
+      "uses": [
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 4,
+          "field": "diagram1"
+        }
+      ]
+    },
+    {
+      "code": "im1-032",
+      "status": "found",
+      "archiveFile": "im1-032.dwg",
+      "localFile": "cad-sources/im1-032.dwg",
+      "alias": null,
+      "bytes": 78469,
+      "sha256": "c1d327a86514a2a4b2bb64307096a6eb0e91230f4e5672b5be2e87a2c11b1e89",
+      "uses": [
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 16,
+          "field": "diagram1"
+        }
+      ]
+    },
+    {
+      "code": "im1-033",
+      "status": "found",
+      "archiveFile": "im1-033.dwg",
+      "localFile": "cad-sources/im1-033.dwg",
+      "alias": null,
+      "bytes": 78469,
+      "sha256": "ab722f77ee1585a691759330f207f72bf160ce94788676311cf8056915d26818",
+      "uses": [
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 28,
+          "field": "diagram1"
+        }
+      ]
+    },
+    {
+      "code": "im1-034",
+      "status": "found",
+      "archiveFile": "im1-034.dwg",
+      "localFile": "cad-sources/im1-034.dwg",
+      "alias": null,
+      "bytes": 78469,
+      "sha256": "d0e7627392ee7274b0612d4a37d74613bf1dd53972ff18c74693e305254e0381",
+      "uses": [
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 40,
+          "field": "diagram1"
+        }
+      ]
+    },
+    {
+      "code": "im1-041",
+      "status": "found",
+      "archiveFile": "im1-041.dwg",
+      "localFile": "cad-sources/im1-041.dwg",
+      "alias": null,
+      "bytes": 76085,
+      "sha256": "5fddf0821b566b8b7e64e0e13fa06d88a5beab71f24e679ac593d8a6add41b9e",
+      "uses": [
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 5,
+          "field": "diagram1"
+        }
+      ]
+    },
+    {
+      "code": "im1-042",
+      "status": "found",
+      "archiveFile": "im1-042.dwg",
+      "localFile": "cad-sources/im1-042.dwg",
+      "alias": null,
+      "bytes": 76085,
+      "sha256": "564dd3a085a08972599066b17aebeec31904874bcccc070c6203026fc79703a7",
+      "uses": [
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 17,
+          "field": "diagram1"
+        }
+      ]
+    },
+    {
+      "code": "im1-043",
+      "status": "found",
+      "archiveFile": "im1-043.dwg",
+      "localFile": "cad-sources/im1-043.dwg",
+      "alias": null,
+      "bytes": 76085,
+      "sha256": "bac6b0977695c3fce93bda0f381cb27f827ebe415628f86fd71d735ea11c5104",
+      "uses": [
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 29,
+          "field": "diagram1"
+        }
+      ]
+    },
+    {
+      "code": "im1-044",
+      "status": "found",
+      "archiveFile": "im1-044.dwg",
+      "localFile": "cad-sources/im1-044.dwg",
+      "alias": null,
+      "bytes": 76085,
+      "sha256": "c29854d13be9fb5c94c5fddad3bf0e3fbad823fa27fed6a5d1d49be8be3e1d95",
+      "uses": [
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 41,
+          "field": "diagram1"
+        }
+      ]
+    },
+    {
+      "code": "im1-051",
+      "status": "found",
+      "archiveFile": "im1-051.dwg",
+      "localFile": "cad-sources/im1-051.dwg",
+      "alias": null,
+      "bytes": 85260,
+      "sha256": "fb509f35ea80d6bfb8719b153ab4faac02af5cefbd5c8000e5ef0134cd97f7f5",
+      "uses": [
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 6,
+          "field": "diagram1"
+        }
+      ]
+    },
+    {
+      "code": "im1-052",
+      "status": "found",
+      "archiveFile": "im1-052.dwg",
+      "localFile": "cad-sources/im1-052.dwg",
+      "alias": null,
+      "bytes": 85268,
+      "sha256": "e24c5d61420b0527f8b32fc6d1ec21cec7e972fb1dd0cd42be0fe19c8ae855fb",
+      "uses": [
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 18,
+          "field": "diagram1"
+        }
+      ]
+    },
+    {
+      "code": "im1-053",
+      "status": "found",
+      "archiveFile": "im1-053.dwg",
+      "localFile": "cad-sources/im1-053.dwg",
+      "alias": null,
+      "bytes": 85268,
+      "sha256": "901f044995f6a7b582e8ef1b7c58b7249fb9a5571b691a797d210a04ca1e08c5",
+      "uses": [
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 30,
+          "field": "diagram1"
+        }
+      ]
+    },
+    {
+      "code": "im1-054",
+      "status": "found",
+      "archiveFile": "im1-054.dwg",
+      "localFile": "cad-sources/im1-054.dwg",
+      "alias": null,
+      "bytes": 85268,
+      "sha256": "a1f2cacfbbe1265115c5708e08492df9467090d37a053e29d48e537b76f9ba89",
+      "uses": [
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 42,
+          "field": "diagram1"
+        }
+      ]
+    },
+    {
+      "code": "im1-061",
+      "status": "found",
+      "archiveFile": "im1-061.dwg",
+      "localFile": "cad-sources/im1-061.dwg",
+      "alias": null,
+      "bytes": 61534,
+      "sha256": "96e0f354759cb592ac9fcfc0cdd2f8fe00f6098ffbfe81c4d4a80fbb2bc82d58",
+      "uses": [
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 7,
+          "field": "diagram1"
+        }
+      ]
+    },
+    {
+      "code": "im1-062",
+      "status": "found",
+      "archiveFile": "im1-062.dwg",
+      "localFile": "cad-sources/im1-062.dwg",
+      "alias": null,
+      "bytes": 81096,
+      "sha256": "b7775a45ed78b498b971682e91a9ecdb9e8fcc86c92a73a08ee75ab22d99cbe0",
+      "uses": [
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 19,
+          "field": "diagram1"
+        }
+      ]
+    },
+    {
+      "code": "im1-063",
+      "status": "found",
+      "archiveFile": "im1-063.dwg",
+      "localFile": "cad-sources/im1-063.dwg",
+      "alias": null,
+      "bytes": 81096,
+      "sha256": "de6bd41e7ec63192f142c4254d3bf775f001e0216a0d8cdf9b3776ea2e82c099",
+      "uses": [
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 31,
+          "field": "diagram1"
+        }
+      ]
+    },
+    {
+      "code": "im1-064",
+      "status": "found",
+      "archiveFile": "im1-064.dwg",
+      "localFile": "cad-sources/im1-064.dwg",
+      "alias": null,
+      "bytes": 81096,
+      "sha256": "7699788e7f89847400c9af7295dae79aa6186c9d692054bae46f3abade5618b0",
+      "uses": [
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 43,
+          "field": "diagram1"
+        }
+      ]
+    },
+    {
+      "code": "im1-071",
+      "status": "found",
+      "archiveFile": "im1-071.dwg",
+      "localFile": "cad-sources/im1-071.dwg",
+      "alias": null,
+      "bytes": 85193,
+      "sha256": "d792d01003eea9aeccd69f1c2a8bd6f7d079ca356bba5ab198bf0af47498a749",
+      "uses": [
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 8,
+          "field": "diagram1"
+        }
+      ]
+    },
+    {
+      "code": "im1-072",
+      "status": "found",
+      "archiveFile": "im1-072.dwg",
+      "localFile": "cad-sources/im1-072.dwg",
+      "alias": null,
+      "bytes": 85193,
+      "sha256": "df563d6545ca004ad0b32a44a26f8b91c91b2f187c9e3c8b044dc5208b213dac",
+      "uses": [
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 20,
+          "field": "diagram1"
+        }
+      ]
+    },
+    {
+      "code": "im1-073",
+      "status": "found",
+      "archiveFile": "im1-073.dwg",
+      "localFile": "cad-sources/im1-073.dwg",
+      "alias": null,
+      "bytes": 89749,
+      "sha256": "38efcc87a60d94f441247fac19d41e876d14e72617433dd0e06f237f9f1446e6",
+      "uses": [
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 32,
+          "field": "diagram1"
+        }
+      ]
+    },
+    {
+      "code": "im1-074",
+      "status": "found",
+      "archiveFile": "im1-074.dwg",
+      "localFile": "cad-sources/im1-074.dwg",
+      "alias": null,
+      "bytes": 89749,
+      "sha256": "814230d5fb4eb1d2d141fc49c1b2dd80a461d23c56a39173d64bc17763fa11e6",
+      "uses": [
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 44,
+          "field": "diagram1"
+        }
+      ]
+    },
+    {
+      "code": "im1-081",
+      "status": "found",
+      "archiveFile": "im1-081.dwg",
+      "localFile": "cad-sources/im1-081.dwg",
+      "alias": null,
+      "bytes": 85193,
+      "sha256": "cfc08706eb8ef7dfe5089eb280f9caf24bcace4fd80eececf2d86f6db3115b59",
+      "uses": [
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 9,
+          "field": "diagram1"
+        }
+      ]
+    },
+    {
+      "code": "im1-082",
+      "status": "found",
+      "archiveFile": "im1-082.dwg",
+      "localFile": "cad-sources/im1-082.dwg",
+      "alias": null,
+      "bytes": 85193,
+      "sha256": "15eadb23077ae62251b8ed460779dd5ae2c3dcdb8fc26c4d92b8641b95cf9546",
+      "uses": [
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 21,
+          "field": "diagram1"
+        }
+      ]
+    },
+    {
+      "code": "im1-083",
+      "status": "found",
+      "archiveFile": "im1-083.dwg",
+      "localFile": "cad-sources/im1-083.dwg",
+      "alias": null,
+      "bytes": 85193,
+      "sha256": "66b4d45757535e919b99786be17cb6ba24190f00f5d922d4ab635d1e670da083",
+      "uses": [
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 33,
+          "field": "diagram1"
+        }
+      ]
+    },
+    {
+      "code": "im1-084",
+      "status": "found",
+      "archiveFile": "im1-084.dwg",
+      "localFile": "cad-sources/im1-084.dwg",
+      "alias": null,
+      "bytes": 85193,
+      "sha256": "cdc8cc41262a64ab3aacfe11e3fe2c0d06f8d93a3d70c4441055a2db22db5ebb",
+      "uses": [
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 45,
+          "field": "diagram1"
+        }
+      ]
+    },
+    {
+      "code": "im1-091",
+      "status": "found",
+      "archiveFile": "im1-091.dwg",
+      "localFile": "cad-sources/im1-091.dwg",
+      "alias": null,
+      "bytes": 84476,
+      "sha256": "9b04b37da189d62f412c22c8c72b8d67f79c503b7ef57c812cb9ca4943c09ee4",
+      "uses": [
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 10,
+          "field": "diagram1"
+        }
+      ]
+    },
+    {
+      "code": "im1-092",
+      "status": "found",
+      "archiveFile": "im1-092.dwg",
+      "localFile": "cad-sources/im1-092.dwg",
+      "alias": null,
+      "bytes": 84476,
+      "sha256": "6b59f3c4241da6450152db689b835a131d107d9823aaab4d8ea404b495008ce0",
+      "uses": [
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 22,
+          "field": "diagram1"
+        }
+      ]
+    },
+    {
+      "code": "im1-093",
+      "status": "found",
+      "archiveFile": "im1-093.dwg",
+      "localFile": "cad-sources/im1-093.dwg",
+      "alias": null,
+      "bytes": 84476,
+      "sha256": "be0c81f4dd646ad19d0a844a8081b631a4abc399afd5d3a177178203704915a9",
+      "uses": [
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 34,
+          "field": "diagram1"
+        }
+      ]
+    },
+    {
+      "code": "im1-094",
+      "status": "found",
+      "archiveFile": "im1-094.dwg",
+      "localFile": "cad-sources/im1-094.dwg",
+      "alias": null,
+      "bytes": 85300,
+      "sha256": "7952e8ae1a0dfb95274391410f6407ba3b3e740e710eef81f7ece2cd86e364c1",
+      "uses": [
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 46,
+          "field": "diagram1"
+        }
+      ]
+    },
+    {
+      "code": "im1-101",
+      "status": "found",
+      "archiveFile": "im1-101.dwg",
+      "localFile": "cad-sources/im1-101.dwg",
+      "alias": null,
+      "bytes": 78995,
+      "sha256": "1e13c0e11042987b9726668e483aa91b1b7b5b6bc24014795ecfdb1abdf72232",
+      "uses": [
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 11,
+          "field": "diagram1"
+        }
+      ]
+    },
+    {
+      "code": "im1-102",
+      "status": "found",
+      "archiveFile": "im1-102.dwg",
+      "localFile": "cad-sources/im1-102.dwg",
+      "alias": null,
+      "bytes": 78995,
+      "sha256": "5429ad87b711f350b7e666316dc9c897a50d98d8e41e2f1ab4a8c78b5b1a2158",
+      "uses": [
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 23,
+          "field": "diagram1"
+        }
+      ]
+    },
+    {
+      "code": "im1-103",
+      "status": "found",
+      "archiveFile": "im1-103.dwg",
+      "localFile": "cad-sources/im1-103.dwg",
+      "alias": null,
+      "bytes": 78995,
+      "sha256": "9c1778bcaa8732037b055cdf71d694abe77fadeb7480e22e896bc30789483696",
+      "uses": [
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 35,
+          "field": "diagram1"
+        }
+      ]
+    },
+    {
+      "code": "im1-104",
+      "status": "found",
+      "archiveFile": "im1-104.dwg",
+      "localFile": "cad-sources/im1-104.dwg",
+      "alias": null,
+      "bytes": 85643,
+      "sha256": "68b8e59758371f9f442c317bf779b57003e977c43c1a66b64c4d3e750c74a9f3",
+      "uses": [
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 47,
+          "field": "diagram1"
+        }
+      ]
+    },
+    {
+      "code": "im1-111",
+      "status": "found",
+      "archiveFile": "im1-111.dwg",
+      "localFile": "cad-sources/im1-111.dwg",
+      "alias": null,
+      "bytes": 79663,
+      "sha256": "bfc8510af54ea5d1d6ca7c64a46223c43425e4e5bf1758e0b4ac011c80fda416",
+      "uses": [
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 12,
+          "field": "diagram1"
+        }
+      ]
+    },
+    {
+      "code": "im1-112",
+      "status": "found",
+      "archiveFile": "im1-112.dwg",
+      "localFile": "cad-sources/im1-112.dwg",
+      "alias": null,
+      "bytes": 79663,
+      "sha256": "7f3b86ed4dfa8afe526db220d398d36805a1cc3c2034acf708fe55386fc216b1",
+      "uses": [
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 24,
+          "field": "diagram1"
+        }
+      ]
+    },
+    {
+      "code": "im1-113",
+      "status": "found",
+      "archiveFile": "im1-113.dwg",
+      "localFile": "cad-sources/im1-113.dwg",
+      "alias": null,
+      "bytes": 79663,
+      "sha256": "d23d70e686d649d3456ebab28cf02a8199c8ef82bdf824c12bc1d33271e10b20",
+      "uses": [
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 36,
+          "field": "diagram1"
+        }
+      ]
+    },
+    {
+      "code": "im1-114",
+      "status": "found",
+      "archiveFile": "im1-114.dwg",
+      "localFile": "cad-sources/im1-114.dwg",
+      "alias": null,
+      "bytes": 84419,
+      "sha256": "380139e4416e23e1b4574210afdd44c69a9d129726047a7a5a451ac0d6209824",
+      "uses": [
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 48,
+          "field": "diagram1"
+        }
+      ]
+    },
+    {
+      "code": "im1-121",
+      "status": "found",
+      "archiveFile": "im1-121.dwg",
+      "localFile": "cad-sources/im1-121.dwg",
+      "alias": null,
+      "bytes": 79663,
+      "sha256": "41e928d950884771846835655fad6274f8ad25a7e3d88ddb3828bada93117f68",
+      "uses": [
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 13,
+          "field": "diagram1"
+        }
+      ]
+    },
+    {
+      "code": "im1-122",
+      "status": "found",
+      "archiveFile": "im1-122.dwg",
+      "localFile": "cad-sources/im1-122.dwg",
+      "alias": null,
+      "bytes": 79663,
+      "sha256": "7d1e83fe6a6543212d03c6db2aa078e807e4ec94c360069b7a4fa50f7005c558",
+      "uses": [
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 25,
+          "field": "diagram1"
+        }
+      ]
+    },
+    {
+      "code": "im1-123",
+      "status": "found",
+      "archiveFile": "im1-123.dwg",
+      "localFile": "cad-sources/im1-123.dwg",
+      "alias": null,
+      "bytes": 79663,
+      "sha256": "99b0c520a614d491a7613ed5f2466f7880d91198f2615121380d530f4baceec3",
+      "uses": [
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 37,
+          "field": "diagram1"
+        }
+      ]
+    },
+    {
+      "code": "im1-124",
+      "status": "found",
+      "archiveFile": "im1-124.dwg",
+      "localFile": "cad-sources/im1-124.dwg",
+      "alias": null,
+      "bytes": 79663,
+      "sha256": "f301ff3145a2f254387410c39f0b741304375431252e6d0594f735496a9b44e2",
+      "uses": [
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 49,
+          "field": "diagram1"
+        }
+      ]
+    },
+    {
+      "code": "im2-1",
+      "status": "found",
+      "archiveFile": "im2-011.dwg",
+      "localFile": "cad-sources/im2-1.dwg",
+      "alias": {
+        "archiveCode": "im2-011",
+        "reason": "Подтверждённая пользователем ошибка имени в исходном архиве"
+      },
+      "bytes": 71655,
+      "sha256": "928631a5e83175233fca4c71a3e9f34228e508a6192757e46883347bc6795a53",
+      "uses": [
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 2,
+          "field": "diagram2"
+        },
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 3,
+          "field": "diagram2"
+        },
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 12,
+          "field": "diagram2"
+        },
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 13,
+          "field": "diagram2"
+        },
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 14,
+          "field": "diagram2"
+        },
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 15,
+          "field": "diagram2"
+        },
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 24,
+          "field": "diagram2"
+        },
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 25,
+          "field": "diagram2"
+        },
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 26,
+          "field": "diagram2"
+        },
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 27,
+          "field": "diagram2"
+        },
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 36,
+          "field": "diagram2"
+        },
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 37,
+          "field": "diagram2"
+        },
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 38,
+          "field": "diagram2"
+        },
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 39,
+          "field": "diagram2"
+        },
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 48,
+          "field": "diagram2"
+        },
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 49,
+          "field": "diagram2"
+        }
+      ]
+    },
+    {
+      "code": "im2-2",
+      "status": "found",
+      "archiveFile": "im2-2.dwg",
+      "localFile": "cad-sources/im2-2.dwg",
+      "alias": null,
+      "bytes": 72915,
+      "sha256": "58cee9de6290200bbfb42ce5bec4599f7aaee5532a5420876ed1b577f5c3a993",
+      "uses": [
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 4,
+          "field": "diagram2"
+        },
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 5,
+          "field": "diagram2"
+        },
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 6,
+          "field": "diagram2"
+        },
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 8,
+          "field": "diagram2"
+        },
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 9,
+          "field": "diagram2"
+        },
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 16,
+          "field": "diagram2"
+        },
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 17,
+          "field": "diagram2"
+        },
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 18,
+          "field": "diagram2"
+        },
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 20,
+          "field": "diagram2"
+        },
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 21,
+          "field": "diagram2"
+        },
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 28,
+          "field": "diagram2"
+        },
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 29,
+          "field": "diagram2"
+        },
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 30,
+          "field": "diagram2"
+        },
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 32,
+          "field": "diagram2"
+        },
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 33,
+          "field": "diagram2"
+        },
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 40,
+          "field": "diagram2"
+        },
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 41,
+          "field": "diagram2"
+        },
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 42,
+          "field": "diagram2"
+        },
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 44,
+          "field": "diagram2"
+        },
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 45,
+          "field": "diagram2"
+        }
+      ]
+    },
+    {
+      "code": "im2-3",
+      "status": "found",
+      "archiveFile": "im2-3.dwg",
+      "localFile": "cad-sources/im2-3.dwg",
+      "alias": null,
+      "bytes": 59294,
+      "sha256": "afb419e6d4f741e8c13454bac5b36a511755ad14c953d1840ea2319c41c60d62",
+      "uses": [
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 7,
+          "field": "diagram2"
+        },
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 19,
+          "field": "diagram2"
+        },
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 31,
+          "field": "diagram2"
+        },
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 43,
+          "field": "diagram2"
+        }
+      ]
+    },
+    {
+      "code": "im2-4",
+      "status": "found",
+      "archiveFile": "im2-4.dwg",
+      "localFile": "cad-sources/im2-4.dwg",
+      "alias": null,
+      "bytes": 81406,
+      "sha256": "1abde52ec805997a39f5ce295a65e22789aa6bba6e5bc81676407f87ddd2551a",
+      "uses": [
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 10,
+          "field": "diagram2"
+        },
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 11,
+          "field": "diagram2"
+        },
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 22,
+          "field": "diagram2"
+        },
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 23,
+          "field": "diagram2"
+        },
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 34,
+          "field": "diagram2"
+        },
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 35,
+          "field": "diagram2"
+        },
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 46,
+          "field": "diagram2"
+        },
+        {
+          "sheet": "diagram 1",
+          "sourceRow": 47,
+          "field": "diagram2"
+        }
+      ]
+    },
+    {
+      "code": "pr1-011",
+      "status": "found",
+      "archiveFile": "pr1-011.dwg",
+      "localFile": "cad-sources/pr1-011.dwg",
+      "alias": null,
+      "bytes": 69695,
+      "sha256": "29b6537d7bd9f6b4a991738a6d40a7c49ba5445ca25720890a9b6688d5782d7d",
+      "uses": [
+        {
+          "sheet": "diagram 2",
+          "sourceRow": 4,
+          "field": "diagram1"
+        },
+        {
+          "sheet": "diagram 2",
+          "sourceRow": 5,
+          "field": "diagram1"
+        },
+        {
+          "sheet": "diagram 2",
+          "sourceRow": 8,
+          "field": "diagram1"
+        }
+      ]
+    },
+    {
+      "code": "pr1-021",
+      "status": "found",
+      "archiveFile": "pr1-021.dwg",
+      "localFile": "cad-sources/pr1-021.dwg",
+      "alias": null,
+      "bytes": 70485,
+      "sha256": "10f062b1df96b66b26645f59ab0ae5db496d65dc56b201ded138c17016690e99",
+      "uses": [
+        {
+          "sheet": "diagram 2",
+          "sourceRow": 6,
+          "field": "diagram1"
+        },
+        {
+          "sheet": "diagram 2",
+          "sourceRow": 9,
+          "field": "diagram1"
+        }
+      ]
+    },
+    {
+      "code": "pr1-031",
+      "status": "found",
+      "archiveFile": "pr1-031.dwg",
+      "localFile": "cad-sources/pr1-031.dwg",
+      "alias": null,
+      "bytes": 70492,
+      "sha256": "759499003434671091f10719dc98b900cf50100d8820e7526c33b8042f091708",
+      "uses": [
+        {
+          "sheet": "diagram 2",
+          "sourceRow": 7,
+          "field": "diagram1"
+        },
+        {
+          "sheet": "diagram 2",
+          "sourceRow": 10,
+          "field": "diagram1"
+        }
+      ]
+    },
+    {
+      "code": "pr2-1",
+      "status": "found",
+      "archiveFile": "pr2-1.dwg",
+      "localFile": "cad-sources/pr2-1.dwg",
+      "alias": null,
+      "bytes": 71166,
+      "sha256": "45021f4b10b4b5073501925a55b42208c2a98f346251e4618147a7879fd91277",
+      "uses": [
+        {
+          "sheet": "diagram 2",
+          "sourceRow": 4,
+          "field": "diagram2"
+        },
+        {
+          "sheet": "diagram 2",
+          "sourceRow": 5,
+          "field": "diagram2"
+        },
+        {
+          "sheet": "diagram 2",
+          "sourceRow": 8,
+          "field": "diagram2"
+        }
+      ]
+    },
+    {
+      "code": "pr2-2",
+      "status": "found",
+      "archiveFile": "pr2-2.dwg",
+      "localFile": "cad-sources/pr2-2.dwg",
+      "alias": null,
+      "bytes": 71339,
+      "sha256": "e3ec23f068167320cfb6ad1cbcf96633f23cfc63f087ea147a577b8cb55ee05c",
+      "uses": [
+        {
+          "sheet": "diagram 2",
+          "sourceRow": 6,
+          "field": "diagram2"
+        },
+        {
+          "sheet": "diagram 2",
+          "sourceRow": 9,
+          "field": "diagram2"
+        }
+      ]
+    },
+    {
+      "code": "pr2-3",
+      "status": "found",
+      "archiveFile": "pr2-3.dwg",
+      "localFile": "cad-sources/pr2-3.dwg",
+      "alias": null,
+      "bytes": 76555,
+      "sha256": "24fae258b2a579229de6142f72cfe511a829ec611be77b1ee48bfa819d708954",
+      "uses": [
+        {
+          "sheet": "diagram 2",
+          "sourceRow": 7,
+          "field": "diagram2"
+        },
+        {
+          "sheet": "diagram 2",
+          "sourceRow": 10,
+          "field": "diagram2"
+        }
+      ]
+    }
+  ]
+}

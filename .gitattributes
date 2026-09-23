@@ -1,0 +1,4 @@
+*.dwg -text -diff
+*.dxf -text -diff
+*.xlsx -text -diff
+*.png -text -diff
