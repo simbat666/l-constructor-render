@@ -55,18 +55,18 @@
     },
     {
       "code": "im1-011",
-      "sourceSha256": "f5a4a7fed2404b6d4ac3304582ce74a82c4c1cfda194b5bc4cd0bccda4940cb3",
+      "sourceSha256": "8d1ccccfcd8d37ef73045c7bf458c11f4494da13824dd201d6127c5e748397a9",
       "output": {
         "dxfVersion": "AC1032",
-        "bytes": 272172,
-        "sha256": "e09d4e35540f9c05952d914eb5341ff103f5feac0575c12357b5e5a0461cec7a",
-        "entityCount": 112,
+        "bytes": 273159,
+        "sha256": "7edba17f40753ff662f32bfcabba3ab3e1ad0ea352a1dbfac51145c095009913",
+        "entityCount": 114,
         "auditErrors": 0,
         "extents": [
-          4480.733,
-          5944.305,
-          4536.744,
-          6149.179
+          4483.147543915651,
+          5949.018344986801,
+          4679.0518702950585,
+          6161.322368121759
         ]
       }
     },

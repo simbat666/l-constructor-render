@@ -3,11 +3,13 @@ import copy
 import json
 import sys
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'scripts'))
 
+import cabinet_engine
 from cabinet_engine import calculate_cabinet
 from questionnaire import BASE, prune_state, visible_groups
 
@@ -55,6 +57,48 @@ class FrozenEngineFixturesTests(unittest.TestCase):
             with self.subTest(case=case['id']):
                 actual = concise(calculate_cabinet(copy.deepcopy(case['motors'])), case['expected'])
                 self.assertEqual(actual, case['expected'])
+
+    def test_repeated_motors_select_one_module_for_whole_cabinet(self):
+        source = next(case for case in FIXTURES['cases'] if case['id'] == 'direct-motor')['motors'][0]
+        motors = []
+        for index in range(16):
+            motor = copy.deepcopy(source)
+            motor['id'] = f'motor-{index + 1}'
+            motor['tag'] = f'M{index + 1}'
+            motors.append(motor)
+        calculation = calculate_cabinet(motors)
+        self.assertEqual(calculation['errors'], [])
+        self.assertEqual([item['ref'] for item in calculation['modules']], ['M1'])
+        self.assertEqual([item['ref'] for item in calculation['plcHardware']], ['PLC', 'M1'])
+        channels = [channel for block in calculation['blocks'] for channel in block['channels']]
+        self.assertEqual(len(channels), 32)
+        self.assertEqual(len({(item['deviceRef'], item['address']) for item in channels}), 32)
+
+    def test_cad_names_follow_active_ol_answers(self):
+        self.assertEqual([(row['keyDiagram'], row['sourceRow']) for row in BASE['diagramHeads']],
+                         [('Imd-3', 2), ('Imd-1', 3), ('Imd-2', 4)])
+        case = next(case for case in FIXTURES['cases'] if case['id'] == 'direct-motor')
+        result = calculate_cabinet(copy.deepcopy(case['motors']))
+        self.assertTrue(result['instances'])
+        # The source OL has no diagram-head mapping for im1-014; direct-motor
+        # still must carry no invented header fields.
+        self.assertEqual(result['instances'][0]['cadHeadRules'], [])
+
+        row = next(row for row in BASE['diagrams1'] if row['diagram1'] == 'im1-011')
+        with patch.object(cabinet_engine, 'diagram_rows', return_value={'rows': [row], 'missing': []}):
+            selected = calculate_cabinet(copy.deepcopy(case['motors']))
+        electrical = next(item for item in selected['instances'] if item['code'] == 'im1-011')
+        self.assertEqual([(r['keyDiagram'], r['value']) for r in electrical['cadHeadRules']],
+                         [('Imd-3', 'Насос'), ('Imd-1', 'M1'), ('Imd-2', 'M1')])
+        self.assertEqual(electrical['channels'][0]['commonDesignation'], 'GND1')
+
+        custom = copy.deepcopy(case['motors'])
+        custom[0]['state']['selected']['Ques 1:Тип технологического устройства:list'] = '11.1'
+        custom[0]['state']['inputs']['Ques 1:12.1'] = 'Смеситель'
+        with patch.object(cabinet_engine, 'diagram_rows', return_value={'rows': [row], 'missing': []}):
+            custom_result = calculate_cabinet(custom)
+        custom_head = next(item for item in custom_result['instances'] if item['code'] == 'im1-011')['cadHeadRules']
+        self.assertEqual(custom_head[0]['value'], 'Смеситель')
 
     def test_vfd_questionnaire_branches(self):
         by_id = {case['id']: case for case in FIXTURES['cases']}

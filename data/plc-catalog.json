@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "sources": {
     "composition": {
       "file": "Состав ПЛК.xlsx",
@@ -7,7 +7,7 @@
     },
     "marking": {
       "file": "Правило_обозначения и маркировки элемкнтов на схеме_Э3_В2.xlsx",
-      "sha256": "c37da94b21bcd8e6d1fd33ec8f8f0a3d1a4a9ac4566b8e4faf66530076eb7802"
+      "sha256": "6ee1767df875fbc427c1abc6e7461959c02cd3767a3a343bf053a551cbc1a8e1"
     }
   },
   "controller": {
@@ -38,7 +38,8 @@
       ],
       "group": "Universal inputs, group 1",
       "key": "#DI24-PNP",
-      "commonKey": "#GND1"
+      "commonKey": "#GND1",
+      "commonDesignation": "GND1"
     },
     {
       "sourceRow": 3,
@@ -48,7 +49,8 @@
       ],
       "group": "Universal inputs, group 1",
       "key": "#DI24-PNP",
-      "commonKey": "#GND1"
+      "commonKey": "#GND1",
+      "commonDesignation": "GND1"
     },
     {
       "sourceRow": 4,
@@ -58,7 +60,8 @@
       ],
       "group": "Universal inputs, group 1",
       "key": "#DI24-PNP",
-      "commonKey": "#GND1"
+      "commonKey": "#GND1",
+      "commonDesignation": "GND1"
     },
     {
       "sourceRow": 5,
@@ -68,7 +71,8 @@
       ],
       "group": "Universal inputs, group 1",
       "key": "#DI24-PNP",
-      "commonKey": "#GND1"
+      "commonKey": "#GND1",
+      "commonDesignation": "GND1"
     },
     {
       "sourceRow": 6,
@@ -78,7 +82,8 @@
       ],
       "group": "Universal inputs, group 1",
       "key": "#DI24-PNP",
-      "commonKey": "#GND1"
+      "commonKey": "#GND1",
+      "commonDesignation": "GND1"
     },
     {
       "sourceRow": 7,
@@ -88,7 +93,8 @@
       ],
       "group": "Universal inputs, group 1",
       "key": "#DI24-PNP",
-      "commonKey": "#GND1"
+      "commonKey": "#GND1",
+      "commonDesignation": "GND1"
     },
     {
       "sourceRow": 8,
@@ -98,7 +104,8 @@
       ],
       "group": "Universal inputs, group 1",
       "key": "#AI-U0_10",
-      "commonKey": "#GND1"
+      "commonKey": "#GND1",
+      "commonDesignation": "GND1"
     },
     {
       "sourceRow": 9,
@@ -108,7 +115,8 @@
       ],
       "group": "Universal inputs, group 1",
       "key": "#AI-U0_10",
-      "commonKey": "#GND1"
+      "commonKey": "#GND1",
+      "commonDesignation": "GND1"
     },
     {
       "sourceRow": 10,
@@ -118,7 +126,8 @@
       ],
       "group": "Universal inputs, group 1",
       "key": "#AI-U0_10",
-      "commonKey": "#GND1"
+      "commonKey": "#GND1",
+      "commonDesignation": "GND1"
     },
     {
       "sourceRow": 11,
@@ -128,7 +137,8 @@
       ],
       "group": "Universal inputs, group 1",
       "key": "#AI-U0_10",
-      "commonKey": "#GND1"
+      "commonKey": "#GND1",
+      "commonDesignation": "GND1"
     },
     {
       "sourceRow": 12,
@@ -138,7 +148,8 @@
       ],
       "group": "Universal inputs, group 1",
       "key": "#AI-U0_10",
-      "commonKey": "#GND1"
+      "commonKey": "#GND1",
+      "commonDesignation": "GND1"
     },
     {
       "sourceRow": 13,
@@ -148,7 +159,8 @@
       ],
       "group": "Universal inputs, group 1",
       "key": "#AI-U0_10",
-      "commonKey": "#GND1"
+      "commonKey": "#GND1",
+      "commonDesignation": "GND1"
     },
     {
       "sourceRow": 14,
@@ -158,7 +170,8 @@
       ],
       "group": "Universal inputs, group 1",
       "key": "#AI-I0_20-PAS",
-      "commonKey": "#GND1"
+      "commonKey": "#GND1",
+      "commonDesignation": "GND1"
     },
     {
       "sourceRow": 15,
@@ -168,7 +181,8 @@
       ],
       "group": "Universal inputs, group 1",
       "key": "#AI-I0_20-PAS",
-      "commonKey": "#GND1"
+      "commonKey": "#GND1",
+      "commonDesignation": "GND1"
     },
     {
       "sourceRow": 16,
@@ -178,7 +192,8 @@
       ],
       "group": "Universal inputs, group 1",
       "key": "#AI-I0_20-PAS",
-      "commonKey": "#GND1"
+      "commonKey": "#GND1",
+      "commonDesignation": "GND1"
     },
     {
       "sourceRow": 17,
@@ -188,7 +203,8 @@
       ],
       "group": "Universal inputs, group 1",
       "key": "#AI-I0_20-PAS",
-      "commonKey": "#GND1"
+      "commonKey": "#GND1",
+      "commonDesignation": "GND1"
     },
     {
       "sourceRow": 18,
@@ -198,7 +214,8 @@
       ],
       "group": "Universal inputs, group 1",
       "key": "#AI-I0_20-PAS",
-      "commonKey": "#GND1"
+      "commonKey": "#GND1",
+      "commonDesignation": "GND1"
     },
     {
       "sourceRow": 19,
@@ -208,7 +225,8 @@
       ],
       "group": "Universal inputs, group 1",
       "key": "#AI-I0_20-PAS",
-      "commonKey": "#GND1"
+      "commonKey": "#GND1",
+      "commonDesignation": "GND1"
     },
     {
       "sourceRow": 20,
@@ -218,7 +236,8 @@
       ],
       "group": "Universal inputs, group 1",
       "key": "#AI-I4_20-PAS",
-      "commonKey": "#GND1"
+      "commonKey": "#GND1",
+      "commonDesignation": "GND1"
     },
     {
       "sourceRow": 21,
@@ -228,7 +247,8 @@
       ],
       "group": "Universal inputs, group 1",
       "key": "#AI-I4_20-PAS",
-      "commonKey": "#GND1"
+      "commonKey": "#GND1",
+      "commonDesignation": "GND1"
     },
     {
       "sourceRow": 22,
@@ -238,7 +258,8 @@
       ],
       "group": "Universal inputs, group 1",
       "key": "#AI-I4_20-PAS",
-      "commonKey": "#GND1"
+      "commonKey": "#GND1",
+      "commonDesignation": "GND1"
     },
     {
       "sourceRow": 23,
@@ -248,7 +269,8 @@
       ],
       "group": "Universal inputs, group 1",
       "key": "#AI-I4_20-PAS",
-      "commonKey": "#GND1"
+      "commonKey": "#GND1",
+      "commonDesignation": "GND1"
     },
     {
       "sourceRow": 24,
@@ -258,7 +280,8 @@
       ],
       "group": "Universal inputs, group 1",
       "key": "#AI-I4_20-PAS",
-      "commonKey": "#GND1"
+      "commonKey": "#GND1",
+      "commonDesignation": "GND1"
     },
     {
       "sourceRow": 25,
@@ -268,7 +291,8 @@
       ],
       "group": "Universal inputs, group 1",
       "key": "#AI-I4_20-PAS",
-      "commonKey": "#GND1"
+      "commonKey": "#GND1",
+      "commonDesignation": "GND1"
     },
     {
       "sourceRow": 26,
@@ -278,7 +302,8 @@
       ],
       "group": "Universal inputs, group 2",
       "key": "#DI24-NPN",
-      "commonKey": "#GND1"
+      "commonKey": "#GND1",
+      "commonDesignation": "GND1"
     },
     {
       "sourceRow": 27,
@@ -288,7 +313,8 @@
       ],
       "group": "Universal inputs, group 2",
       "key": "#DI24-NPN",
-      "commonKey": "#GND1"
+      "commonKey": "#GND1",
+      "commonDesignation": "GND1"
     },
     {
       "sourceRow": 28,
@@ -298,7 +324,8 @@
       ],
       "group": "Universal inputs, group 2",
       "key": "#DI24-NPN",
-      "commonKey": "#GND1"
+      "commonKey": "#GND1",
+      "commonDesignation": "GND1"
     },
     {
       "sourceRow": 29,
@@ -308,7 +335,8 @@
       ],
       "group": "Universal inputs, group 2",
       "key": "#DI24-NPN",
-      "commonKey": "#GND1"
+      "commonKey": "#GND1",
+      "commonDesignation": "GND1"
     },
     {
       "sourceRow": 30,
@@ -318,7 +346,8 @@
       ],
       "group": "Universal inputs, group 2",
       "key": "#DI24-NPN",
-      "commonKey": "#GND1"
+      "commonKey": "#GND1",
+      "commonDesignation": "GND1"
     },
     {
       "sourceRow": 31,
@@ -328,7 +357,8 @@
       ],
       "group": "Universal inputs, group 2",
       "key": "#DI24-NPN",
-      "commonKey": "#GND1"
+      "commonKey": "#GND1",
+      "commonDesignation": "GND1"
     },
     {
       "sourceRow": 32,
@@ -338,7 +368,8 @@
       ],
       "group": "Universal inputs, group 2",
       "key": "#DI24-HSC-NPN",
-      "commonKey": "#GND1"
+      "commonKey": "#GND1",
+      "commonDesignation": "GND1"
     },
     {
       "sourceRow": 33,
@@ -348,7 +379,8 @@
       ],
       "group": "Universal inputs, group 2",
       "key": "#DI24-HSC-NPN",
-      "commonKey": "#GND1"
+      "commonKey": "#GND1",
+      "commonDesignation": "GND1"
     },
     {
       "sourceRow": 34,
@@ -358,7 +390,8 @@
       ],
       "group": "Universal inputs, group 2",
       "key": "#DI24-HSC-NPN",
-      "commonKey": "#GND1"
+      "commonKey": "#GND1",
+      "commonDesignation": "GND1"
     },
     {
       "sourceRow": 35,
@@ -368,7 +401,8 @@
       ],
       "group": "Universal inputs, group 2",
       "key": "#DI24-HSC-NPN",
-      "commonKey": "#GND1"
+      "commonKey": "#GND1",
+      "commonDesignation": "GND1"
     },
     {
       "sourceRow": 36,
@@ -378,7 +412,8 @@
       ],
       "group": "Universal inputs, group 2",
       "key": "#DI24-HSC-NPN",
-      "commonKey": "#GND1"
+      "commonKey": "#GND1",
+      "commonDesignation": "GND1"
     },
     {
       "sourceRow": 37,
@@ -388,7 +423,8 @@
       ],
       "group": "Universal inputs, group 2",
       "key": "#DI24-HSC-NPN",
-      "commonKey": "#GND1"
+      "commonKey": "#GND1",
+      "commonDesignation": "GND1"
     },
     {
       "sourceRow": 38,
@@ -398,7 +434,8 @@
       ],
       "group": "Universal inputs, group 3",
       "key": "#DI24-NPN",
-      "commonKey": "#GND2"
+      "commonKey": "#GND2",
+      "commonDesignation": "GND2"
     },
     {
       "sourceRow": 39,
@@ -408,7 +445,8 @@
       ],
       "group": "Universal inputs, group 3",
       "key": "#DI24-NPN",
-      "commonKey": "#GND2"
+      "commonKey": "#GND2",
+      "commonDesignation": "GND2"
     },
     {
       "sourceRow": 40,
@@ -418,7 +456,8 @@
       ],
       "group": "Universal inputs, group 3",
       "key": "#DI24-NPN",
-      "commonKey": "#GND2"
+      "commonKey": "#GND2",
+      "commonDesignation": "GND2"
     },
     {
       "sourceRow": 41,
@@ -428,7 +467,8 @@
       ],
       "group": "Universal inputs, group 3",
       "key": "#DI24-NPN",
-      "commonKey": "#GND2"
+      "commonKey": "#GND2",
+      "commonDesignation": "GND2"
     },
     {
       "sourceRow": 42,
@@ -438,7 +478,8 @@
       ],
       "group": "Universal inputs, group 3",
       "key": "#DI24-NPN",
-      "commonKey": "#GND2"
+      "commonKey": "#GND2",
+      "commonDesignation": "GND2"
     },
     {
       "sourceRow": 43,
@@ -448,7 +489,8 @@
       ],
       "group": "Universal inputs, group 3",
       "key": "#DI24-NPN",
-      "commonKey": "#GND2"
+      "commonKey": "#GND2",
+      "commonDesignation": "GND2"
     },
     {
       "sourceRow": 44,
@@ -458,7 +500,8 @@
       ],
       "group": "Universal inputs, group 3",
       "key": "#AI-RTD2",
-      "commonKey": "#GND2"
+      "commonKey": "#GND2",
+      "commonDesignation": "GND2"
     },
     {
       "sourceRow": 45,
@@ -468,7 +511,8 @@
       ],
       "group": "Universal inputs, group 3",
       "key": "#AI-RTD2",
-      "commonKey": "#GND2"
+      "commonKey": "#GND2",
+      "commonDesignation": "GND2"
     },
     {
       "sourceRow": 46,
@@ -478,7 +522,8 @@
       ],
       "group": "Universal inputs, group 3",
       "key": "#AI-RTD2",
-      "commonKey": "#GND2"
+      "commonKey": "#GND2",
+      "commonDesignation": "GND2"
     },
     {
       "sourceRow": 47,
@@ -488,7 +533,8 @@
       ],
       "group": "Universal inputs, group 3",
       "key": "#AI-RTD2",
-      "commonKey": "#GND2"
+      "commonKey": "#GND2",
+      "commonDesignation": "GND2"
     },
     {
       "sourceRow": 48,
@@ -498,7 +544,8 @@
       ],
       "group": "Universal inputs, group 3",
       "key": "#AI-RTD2",
-      "commonKey": "#GND2"
+      "commonKey": "#GND2",
+      "commonDesignation": "GND2"
     },
     {
       "sourceRow": 49,
@@ -508,7 +555,8 @@
       ],
       "group": "Universal inputs, group 3",
       "key": "#AI-RTD2",
-      "commonKey": "#GND2"
+      "commonKey": "#GND2",
+      "commonDesignation": "GND2"
     },
     {
       "sourceRow": 50,
@@ -518,7 +566,8 @@
       ],
       "group": "Universal I/O pins",
       "key": "#DI24-PNP",
-      "commonKey": "#GND3"
+      "commonKey": "#GND3",
+      "commonDesignation": "GND3"
     },
     {
       "sourceRow": 51,
@@ -528,7 +577,8 @@
       ],
       "group": "Universal I/O pins",
       "key": "#DI24-PNP",
-      "commonKey": "#GND3"
+      "commonKey": "#GND3",
+      "commonDesignation": "GND3"
     },
     {
       "sourceRow": 52,
@@ -538,7 +588,8 @@
       ],
       "group": "Universal I/O pins",
       "key": "#DI24-PNP",
-      "commonKey": "#GND3"
+      "commonKey": "#GND3",
+      "commonDesignation": "GND3"
     },
     {
       "sourceRow": 53,
@@ -548,7 +599,8 @@
       ],
       "group": "Universal I/O pins",
       "key": "#DI24-PNP",
-      "commonKey": "#GND3"
+      "commonKey": "#GND3",
+      "commonDesignation": "GND3"
     },
     {
       "sourceRow": 54,
@@ -558,7 +610,8 @@
       ],
       "group": "Universal I/O pins",
       "key": "#DI24-PNP",
-      "commonKey": "#GND3"
+      "commonKey": "#GND3",
+      "commonDesignation": "GND3"
     },
     {
       "sourceRow": 55,
@@ -568,7 +621,8 @@
       ],
       "group": "Universal I/O pins",
       "key": "#DI24-PNP",
-      "commonKey": "#GND3"
+      "commonKey": "#GND3",
+      "commonDesignation": "GND3"
     },
     {
       "sourceRow": 56,
@@ -578,7 +632,8 @@
       ],
       "group": "Universal I/O pins",
       "key": "#AI-U0_10",
-      "commonKey": "#GND3"
+      "commonKey": "#GND3",
+      "commonDesignation": "GND3"
     },
     {
       "sourceRow": 57,
@@ -588,7 +643,8 @@
       ],
       "group": "Universal I/O pins",
       "key": "#AI-U0_10",
-      "commonKey": "#GND3"
+      "commonKey": "#GND3",
+      "commonDesignation": "GND3"
     },
     {
       "sourceRow": 58,
@@ -598,7 +654,8 @@
       ],
       "group": "Universal I/O pins",
       "key": "#AI-U0_10",
-      "commonKey": "#GND3"
+      "commonKey": "#GND3",
+      "commonDesignation": "GND3"
     },
     {
       "sourceRow": 59,
@@ -608,7 +665,8 @@
       ],
       "group": "Universal I/O pins",
       "key": "#AI-U0_10",
-      "commonKey": "#GND3"
+      "commonKey": "#GND3",
+      "commonDesignation": "GND3"
     },
     {
       "sourceRow": 60,
@@ -618,7 +676,8 @@
       ],
       "group": "Universal I/O pins",
       "key": "#AI-U0_10",
-      "commonKey": "#GND3"
+      "commonKey": "#GND3",
+      "commonDesignation": "GND3"
     },
     {
       "sourceRow": 61,
@@ -628,7 +687,8 @@
       ],
       "group": "Universal I/O pins",
       "key": "#AI-U0_10",
-      "commonKey": "#GND3"
+      "commonKey": "#GND3",
+      "commonDesignation": "GND3"
     },
     {
       "sourceRow": 62,
@@ -638,7 +698,8 @@
       ],
       "group": "Universal I/O pins",
       "key": "#AO-U0_10",
-      "commonKey": "#GND3"
+      "commonKey": "#GND3",
+      "commonDesignation": "GND3"
     },
     {
       "sourceRow": 63,
@@ -648,7 +709,8 @@
       ],
       "group": "Universal I/O pins",
       "key": "#AO-U0_10",
-      "commonKey": "#GND3"
+      "commonKey": "#GND3",
+      "commonDesignation": "GND3"
     },
     {
       "sourceRow": 64,
@@ -658,7 +720,8 @@
       ],
       "group": "Universal I/O pins",
       "key": "#AO-U0_10",
-      "commonKey": "#GND3"
+      "commonKey": "#GND3",
+      "commonDesignation": "GND3"
     },
     {
       "sourceRow": 65,
@@ -668,7 +731,8 @@
       ],
       "group": "Universal I/O pins",
       "key": "#AO-U0_10",
-      "commonKey": "#GND3"
+      "commonKey": "#GND3",
+      "commonDesignation": "GND3"
     },
     {
       "sourceRow": 66,
@@ -678,7 +742,8 @@
       ],
       "group": "Universal I/O pins",
       "key": "#AO-U0_10",
-      "commonKey": "#GND3"
+      "commonKey": "#GND3",
+      "commonDesignation": "GND3"
     },
     {
       "sourceRow": 67,
@@ -688,7 +753,8 @@
       ],
       "group": "Universal I/O pins",
       "key": "#AO-U0_10",
-      "commonKey": "#GND3"
+      "commonKey": "#GND3",
+      "commonDesignation": "GND3"
     },
     {
       "sourceRow": 68,
@@ -698,7 +764,8 @@
       ],
       "group": "Universal I/O pins",
       "key": "#AO-U0_10",
-      "commonKey": "#GND3"
+      "commonKey": "#GND3",
+      "commonDesignation": "GND3"
     },
     {
       "sourceRow": 69,
@@ -708,7 +775,8 @@
       ],
       "group": "Universal I/O pins",
       "key": "#AO-U0_10",
-      "commonKey": "#GND3"
+      "commonKey": "#GND3",
+      "commonDesignation": "GND3"
     },
     {
       "sourceRow": 70,
@@ -718,7 +786,8 @@
       ],
       "group": "Universal I/O pins",
       "key": "#DOT-PNP",
-      "commonKey": "#GND3"
+      "commonKey": "#GND3",
+      "commonDesignation": "GND3"
     },
     {
       "sourceRow": 71,
@@ -728,7 +797,8 @@
       ],
       "group": "Universal I/O pins",
       "key": "#DOT-PNP",
-      "commonKey": "#GND3"
+      "commonKey": "#GND3",
+      "commonDesignation": "GND3"
     },
     {
       "sourceRow": 72,
@@ -738,7 +808,8 @@
       ],
       "group": "Universal I/O pins",
       "key": "#DOT-PNP",
-      "commonKey": "#GND3"
+      "commonKey": "#GND3",
+      "commonDesignation": "GND3"
     },
     {
       "sourceRow": 73,
@@ -748,7 +819,8 @@
       ],
       "group": "Universal I/O pins",
       "key": "#DOT-PNP",
-      "commonKey": "#GND3"
+      "commonKey": "#GND3",
+      "commonDesignation": "GND3"
     },
     {
       "sourceRow": 74,
@@ -758,7 +830,8 @@
       ],
       "group": "Universal I/O pins",
       "key": "#DOT-PNP",
-      "commonKey": "#GND3"
+      "commonKey": "#GND3",
+      "commonDesignation": "GND3"
     },
     {
       "sourceRow": 75,
@@ -768,7 +841,8 @@
       ],
       "group": "Universal I/O pins",
       "key": "#DOT-PNP",
-      "commonKey": "#GND3"
+      "commonKey": "#GND3",
+      "commonDesignation": "GND3"
     },
     {
       "sourceRow": 76,
@@ -778,7 +852,8 @@
       ],
       "group": "Universal I/O pins",
       "key": "#DOT-PNP",
-      "commonKey": "#GND3"
+      "commonKey": "#GND3",
+      "commonDesignation": "GND3"
     },
     {
       "sourceRow": 77,
@@ -788,7 +863,8 @@
       ],
       "group": "Universal I/O pins",
       "key": "#DOT-PNP",
-      "commonKey": "#GND3"
+      "commonKey": "#GND3",
+      "commonDesignation": "GND3"
     },
     {
       "sourceRow": 78,
@@ -798,7 +874,8 @@
       ],
       "group": "digital output",
       "key": "#DOT-PNP",
-      "commonKey": "#GND3"
+      "commonKey": "#GND3",
+      "commonDesignation": "GND3"
     },
     {
       "sourceRow": 79,
@@ -808,7 +885,8 @@
       ],
       "group": "digital output",
       "key": "#DOT-PNP",
-      "commonKey": "#GND3"
+      "commonKey": "#GND3",
+      "commonDesignation": "GND3"
     },
     {
       "sourceRow": 80,
@@ -819,7 +897,8 @@
       ],
       "group": "Relay outputs Q1",
       "key": "#DOR-NO",
-      "commonKey": null
+      "commonKey": null,
+      "commonDesignation": null
     },
     {
       "sourceRow": 81,
@@ -830,7 +909,8 @@
       ],
       "group": "Relay outputs Q2",
       "key": "#DOR-NO",
-      "commonKey": null
+      "commonKey": null,
+      "commonDesignation": null
     },
     {
       "sourceRow": 82,
@@ -841,7 +921,8 @@
       ],
       "group": "Relay outputs Q3",
       "key": "#DOR-NO",
-      "commonKey": null
+      "commonKey": null,
+      "commonDesignation": null
     },
     {
       "sourceRow": 83,
@@ -852,7 +933,8 @@
       ],
       "group": "Relay outputs Q4",
       "key": "#DOR-NO",
-      "commonKey": null
+      "commonKey": null,
+      "commonDesignation": null
     },
     {
       "sourceRow": 84,
@@ -863,7 +945,8 @@
       ],
       "group": "Relay outputs Q5",
       "key": "#DOR-NO",
-      "commonKey": null
+      "commonKey": null,
+      "commonDesignation": null
     },
     {
       "sourceRow": 85,
@@ -874,7 +957,8 @@
       ],
       "group": "2xRS-485",
       "key": "#RS-485",
-      "commonKey": null
+      "commonKey": null,
+      "commonDesignation": null
     },
     {
       "sourceRow": 86,
@@ -885,7 +969,542 @@
       ],
       "group": "2xRS-485",
       "key": "#RS-485",
-      "commonKey": null
+      "commonKey": null,
+      "commonDesignation": null
+    }
+  ],
+  "module": {
+    "brand": "ZENTEC",
+    "model": "M245 no display",
+    "generalSignalAmount": 21,
+    "limits": {
+      "DI24-HSC-NPN": 3,
+      "DI24-NPN": 6,
+      "DI24-PNP": 6,
+      "DOT-PNP": 5,
+      "DOR-NO": 5,
+      "AI-RTD2": 3,
+      "AI-I0_20-PAS": 3,
+      "AI-I4_20-PAS": 3,
+      "AI-U0_10": 6,
+      "AO-U0_10": 4,
+      "RS-485": 2
+    },
+    "terminalStatus": "testDerived"
+  },
+  "modulePinOptions": [
+    {
+      "sourceRow": 2,
+      "code": "DI24-PNP",
+      "terminals": [
+        "01"
+      ],
+      "group": "Universal inputs, group 1",
+      "key": "#DI24-PNP",
+      "commonKey": "#GND1",
+      "commonDesignation": "GND1"
+    },
+    {
+      "sourceRow": 3,
+      "code": "DI24-PNP",
+      "terminals": [
+        "02"
+      ],
+      "group": "Universal inputs, group 1",
+      "key": "#DI24-PNP",
+      "commonKey": "#GND1",
+      "commonDesignation": "GND1"
+    },
+    {
+      "sourceRow": 4,
+      "code": "DI24-PNP",
+      "terminals": [
+        "03"
+      ],
+      "group": "Universal inputs, group 1",
+      "key": "#DI24-PNP",
+      "commonKey": "#GND1",
+      "commonDesignation": "GND1"
+    },
+    {
+      "sourceRow": 5,
+      "code": "DI24-PNP",
+      "terminals": [
+        "U1"
+      ],
+      "group": "Universal I/O pins",
+      "key": "#DI24-PNP",
+      "commonKey": "#GND3",
+      "commonDesignation": "GND3"
+    },
+    {
+      "sourceRow": 6,
+      "code": "DI24-PNP",
+      "terminals": [
+        "U2"
+      ],
+      "group": "Universal I/O pins",
+      "key": "#DI24-PNP",
+      "commonKey": "#GND3",
+      "commonDesignation": "GND3"
+    },
+    {
+      "sourceRow": 7,
+      "code": "DI24-PNP",
+      "terminals": [
+        "U3"
+      ],
+      "group": "Universal I/O pins",
+      "key": "#DI24-PNP",
+      "commonKey": "#GND3",
+      "commonDesignation": "GND3"
+    },
+    {
+      "sourceRow": 8,
+      "code": "AI-U0_10",
+      "terminals": [
+        "01"
+      ],
+      "group": "Universal inputs, group 1",
+      "key": "#AI-U0_10",
+      "commonKey": "#GND1",
+      "commonDesignation": "GND1"
+    },
+    {
+      "sourceRow": 9,
+      "code": "AI-U0_10",
+      "terminals": [
+        "02"
+      ],
+      "group": "Universal inputs, group 1",
+      "key": "#AI-U0_10",
+      "commonKey": "#GND1",
+      "commonDesignation": "GND1"
+    },
+    {
+      "sourceRow": 10,
+      "code": "AI-U0_10",
+      "terminals": [
+        "03"
+      ],
+      "group": "Universal inputs, group 1",
+      "key": "#AI-U0_10",
+      "commonKey": "#GND1",
+      "commonDesignation": "GND1"
+    },
+    {
+      "sourceRow": 11,
+      "code": "AI-U0_10",
+      "terminals": [
+        "U1"
+      ],
+      "group": "Universal I/O pins",
+      "key": "#AI-U0_10",
+      "commonKey": "#GND3",
+      "commonDesignation": "GND3"
+    },
+    {
+      "sourceRow": 12,
+      "code": "AI-U0_10",
+      "terminals": [
+        "U2"
+      ],
+      "group": "Universal I/O pins",
+      "key": "#AI-U0_10",
+      "commonKey": "#GND3",
+      "commonDesignation": "GND3"
+    },
+    {
+      "sourceRow": 13,
+      "code": "AI-U0_10",
+      "terminals": [
+        "U3"
+      ],
+      "group": "Universal I/O pins",
+      "key": "#AI-U0_10",
+      "commonKey": "#GND3",
+      "commonDesignation": "GND3"
+    },
+    {
+      "sourceRow": 14,
+      "code": "AI-I0_20-PAS",
+      "terminals": [
+        "01"
+      ],
+      "group": "Universal inputs, group 1",
+      "key": "#AI-I0_20-PAS",
+      "commonKey": "#GND1",
+      "commonDesignation": "GND1"
+    },
+    {
+      "sourceRow": 15,
+      "code": "AI-I0_20-PAS",
+      "terminals": [
+        "02"
+      ],
+      "group": "Universal inputs, group 1",
+      "key": "#AI-I0_20-PAS",
+      "commonKey": "#GND1",
+      "commonDesignation": "GND1"
+    },
+    {
+      "sourceRow": 16,
+      "code": "AI-I0_20-PAS",
+      "terminals": [
+        "03"
+      ],
+      "group": "Universal inputs, group 1",
+      "key": "#AI-I0_20-PAS",
+      "commonKey": "#GND1",
+      "commonDesignation": "GND1"
+    },
+    {
+      "sourceRow": 17,
+      "code": "AI-I4_20-PAS",
+      "terminals": [
+        "01"
+      ],
+      "group": "Universal inputs, group 1",
+      "key": "#AI-I4_20-PAS",
+      "commonKey": "#GND1",
+      "commonDesignation": "GND1"
+    },
+    {
+      "sourceRow": 18,
+      "code": "AI-I4_20-PAS",
+      "terminals": [
+        "02"
+      ],
+      "group": "Universal inputs, group 1",
+      "key": "#AI-I4_20-PAS",
+      "commonKey": "#GND1",
+      "commonDesignation": "GND1"
+    },
+    {
+      "sourceRow": 19,
+      "code": "AI-I4_20-PAS",
+      "terminals": [
+        "03"
+      ],
+      "group": "Universal inputs, group 1",
+      "key": "#AI-I4_20-PAS",
+      "commonKey": "#GND1",
+      "commonDesignation": "GND1"
+    },
+    {
+      "sourceRow": 20,
+      "code": "DI24-NPN",
+      "terminals": [
+        "07"
+      ],
+      "group": "Universal inputs, group 2",
+      "key": "#DI24-NPN",
+      "commonKey": "#GND1",
+      "commonDesignation": "GND1"
+    },
+    {
+      "sourceRow": 21,
+      "code": "DI24-NPN",
+      "terminals": [
+        "08"
+      ],
+      "group": "Universal inputs, group 2",
+      "key": "#DI24-NPN",
+      "commonKey": "#GND1",
+      "commonDesignation": "GND1"
+    },
+    {
+      "sourceRow": 22,
+      "code": "DI24-NPN",
+      "terminals": [
+        "09"
+      ],
+      "group": "Universal inputs, group 2",
+      "key": "#DI24-NPN",
+      "commonKey": "#GND1",
+      "commonDesignation": "GND1"
+    },
+    {
+      "sourceRow": 23,
+      "code": "DI24-NPN",
+      "terminals": [
+        "13"
+      ],
+      "group": "Universal inputs, group 3",
+      "key": "#DI24-NPN",
+      "commonKey": "#GND2",
+      "commonDesignation": "GND2"
+    },
+    {
+      "sourceRow": 24,
+      "code": "DI24-NPN",
+      "terminals": [
+        "14"
+      ],
+      "group": "Universal inputs, group 3",
+      "key": "#DI24-NPN",
+      "commonKey": "#GND2",
+      "commonDesignation": "GND2"
+    },
+    {
+      "sourceRow": 25,
+      "code": "DI24-NPN",
+      "terminals": [
+        "15"
+      ],
+      "group": "Universal inputs, group 3",
+      "key": "#DI24-NPN",
+      "commonKey": "#GND2",
+      "commonDesignation": "GND2"
+    },
+    {
+      "sourceRow": 26,
+      "code": "DI24-HSC-NPN",
+      "terminals": [
+        "07"
+      ],
+      "group": "Universal inputs, group 2",
+      "key": "#DI24-HSC-NPN",
+      "commonKey": "#GND1",
+      "commonDesignation": "GND1"
+    },
+    {
+      "sourceRow": 27,
+      "code": "DI24-HSC-NPN",
+      "terminals": [
+        "08"
+      ],
+      "group": "Universal inputs, group 2",
+      "key": "#DI24-HSC-NPN",
+      "commonKey": "#GND1",
+      "commonDesignation": "GND1"
+    },
+    {
+      "sourceRow": 28,
+      "code": "DI24-HSC-NPN",
+      "terminals": [
+        "09"
+      ],
+      "group": "Universal inputs, group 2",
+      "key": "#DI24-HSC-NPN",
+      "commonKey": "#GND1",
+      "commonDesignation": "GND1"
+    },
+    {
+      "sourceRow": 29,
+      "code": "AI-RTD2",
+      "terminals": [
+        "13"
+      ],
+      "group": "Universal inputs, group 3",
+      "key": "#AI-RTD2",
+      "commonKey": "#GND2",
+      "commonDesignation": "GND2"
+    },
+    {
+      "sourceRow": 30,
+      "code": "AI-RTD2",
+      "terminals": [
+        "14"
+      ],
+      "group": "Universal inputs, group 3",
+      "key": "#AI-RTD2",
+      "commonKey": "#GND2",
+      "commonDesignation": "GND2"
+    },
+    {
+      "sourceRow": 31,
+      "code": "AI-RTD2",
+      "terminals": [
+        "15"
+      ],
+      "group": "Universal inputs, group 3",
+      "key": "#AI-RTD2",
+      "commonKey": "#GND2",
+      "commonDesignation": "GND2"
+    },
+    {
+      "sourceRow": 32,
+      "code": "AO-U0_10",
+      "terminals": [
+        "U1"
+      ],
+      "group": "Universal I/O pins",
+      "key": "#AO-U0_10",
+      "commonKey": "#GND3",
+      "commonDesignation": "GND3"
+    },
+    {
+      "sourceRow": 33,
+      "code": "AO-U0_10",
+      "terminals": [
+        "U2"
+      ],
+      "group": "Universal I/O pins",
+      "key": "#AO-U0_10",
+      "commonKey": "#GND3",
+      "commonDesignation": "GND3"
+    },
+    {
+      "sourceRow": 34,
+      "code": "AO-U0_10",
+      "terminals": [
+        "U3"
+      ],
+      "group": "Universal I/O pins",
+      "key": "#AO-U0_10",
+      "commonKey": "#GND3",
+      "commonDesignation": "GND3"
+    },
+    {
+      "sourceRow": 35,
+      "code": "AO-U0_10",
+      "terminals": [
+        "U4"
+      ],
+      "group": "Universal I/O pins",
+      "key": "#AO-U0_10",
+      "commonKey": "#GND3",
+      "commonDesignation": "GND3"
+    },
+    {
+      "sourceRow": 36,
+      "code": "DOT-PNP",
+      "terminals": [
+        "U1"
+      ],
+      "group": "Universal I/O pins",
+      "key": "#DOT-PNP",
+      "commonKey": "#GND3",
+      "commonDesignation": "GND3"
+    },
+    {
+      "sourceRow": 37,
+      "code": "DOT-PNP",
+      "terminals": [
+        "U2"
+      ],
+      "group": "Universal I/O pins",
+      "key": "#DOT-PNP",
+      "commonKey": "#GND3",
+      "commonDesignation": "GND3"
+    },
+    {
+      "sourceRow": 38,
+      "code": "DOT-PNP",
+      "terminals": [
+        "U3"
+      ],
+      "group": "Universal I/O pins",
+      "key": "#DOT-PNP",
+      "commonKey": "#GND3",
+      "commonDesignation": "GND3"
+    },
+    {
+      "sourceRow": 39,
+      "code": "DOT-PNP",
+      "terminals": [
+        "U4"
+      ],
+      "group": "Universal I/O pins",
+      "key": "#DOT-PNP",
+      "commonKey": "#GND3",
+      "commonDesignation": "GND3"
+    },
+    {
+      "sourceRow": 40,
+      "code": "DOT-PNP",
+      "terminals": [
+        "T1"
+      ],
+      "group": "digital output",
+      "key": "#DOT-PNP",
+      "commonKey": "#GND3",
+      "commonDesignation": "GND3"
+    },
+    {
+      "sourceRow": 41,
+      "code": "DOR-NO",
+      "terminals": [
+        "Q1-1",
+        "Q1-2"
+      ],
+      "group": "Relay outputs Q1",
+      "key": "#DOR-NO",
+      "commonKey": null,
+      "commonDesignation": null
+    },
+    {
+      "sourceRow": 42,
+      "code": "DOR-NO",
+      "terminals": [
+        "Q2-1",
+        "Q2-2"
+      ],
+      "group": "Relay outputs Q2",
+      "key": "#DOR-NO",
+      "commonKey": null,
+      "commonDesignation": null
+    },
+    {
+      "sourceRow": 43,
+      "code": "DOR-NO",
+      "terminals": [
+        "Q3-1",
+        "Q3-2"
+      ],
+      "group": "Relay outputs Q3",
+      "key": "#DOR-NO",
+      "commonKey": null,
+      "commonDesignation": null
+    },
+    {
+      "sourceRow": 44,
+      "code": "DOR-NO",
+      "terminals": [
+        "Q4-1",
+        "Q4-2"
+      ],
+      "group": "Relay outputs Q4",
+      "key": "#DOR-NO",
+      "commonKey": null,
+      "commonDesignation": null
+    },
+    {
+      "sourceRow": 45,
+      "code": "DOR-NO",
+      "terminals": [
+        "Q5-1",
+        "Q5-2"
+      ],
+      "group": "Relay outputs Q5",
+      "key": "#DOR-NO",
+      "commonKey": null,
+      "commonDesignation": null
+    },
+    {
+      "sourceRow": 46,
+      "code": "RS-485",
+      "terminals": [
+        "A0",
+        "B0"
+      ],
+      "group": "2xRS-485",
+      "key": "#RS-485",
+      "commonKey": null,
+      "commonDesignation": null
+    },
+    {
+      "sourceRow": 47,
+      "code": "RS-485",
+      "terminals": [
+        "A1",
+        "B1"
+      ],
+      "group": "2xRS-485",
+      "key": "#RS-485",
+      "commonKey": null,
+      "commonDesignation": null
     }
   ]
 }

@@ -66,11 +66,12 @@
     {
       "code": "im1-011",
       "status": "found",
-      "archiveFile": "im1-011.dwg",
+      "archiveFile": null,
+      "sourceOverride": "user-supplied im1-011.dwg",
       "localFile": "cad-sources/im1-011.dwg",
       "alias": null,
-      "bytes": 79663,
-      "sha256": "f5a4a7fed2404b6d4ac3304582ce74a82c4c1cfda194b5bc4cd0bccda4940cb3",
+      "bytes": 61115,
+      "sha256": "8d1ccccfcd8d37ef73045c7bf458c11f4494da13824dd201d6127c5e748397a9",
       "uses": [
         {
           "sheet": "diagram 1",

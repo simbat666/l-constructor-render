@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 ARCHIVE = Path("/Users/dmitrijmitin/Downloads/Схемы.zip")
 RULES = ROOT / "data" / "motor-v2.json"
 ALIASES = ROOT / "data" / "scheme-aliases.json"
+OVERRIDES = ROOT / "data" / "cad-source-overrides.json"
 OUTPUT = ROOT / "data" / "scheme-library.json"
 SOURCES_DIRECTORY = ROOT / "data" / "cad-sources"
 
@@ -27,6 +28,7 @@ def main() -> None:
 
     rules = json.loads(RULES.read_text(encoding="utf-8"))
     aliases = json.loads(ALIASES.read_text(encoding="utf-8"))
+    overrides = json.loads(OVERRIDES.read_text(encoding="utf-8")) if OVERRIDES.is_file() else {}
     requested_by: dict[str, list[dict[str, object]]] = {}
     for sheet_name, rows in (("diagram 1", rules["diagrams1"]), ("diagram 2", rules["diagrams2"])):
         for row in rows:
@@ -46,6 +48,19 @@ def main() -> None:
         }
         sources = []
         for code, uses in sorted(requested_by.items()):
+            if code in overrides:
+                override = overrides[code]
+                local = ROOT / 'data' / override['file']
+                content = local.read_bytes()
+                digest = hashlib.sha256(content).hexdigest()
+                if digest != override['sha256']:
+                    raise ValueError(f'{code}: изменился локальный DWG-источник; проверь override')
+                sources.append({
+                    'code': code, 'status': 'found', 'archiveFile': None,
+                    'sourceOverride': override['provenance'], 'localFile': override['file'],
+                    'alias': None, 'bytes': len(content), 'sha256': digest, 'uses': uses,
+                })
+                continue
             alias = aliases.get(code)
             archive_code = (alias or {}).get("archiveCode", code).casefold()
             item = dwg_files.get(archive_code)

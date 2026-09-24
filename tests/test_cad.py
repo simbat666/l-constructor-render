@@ -1,4 +1,5 @@
 import importlib.util
+import copy
 from pathlib import Path
 import tempfile
 import unittest
@@ -24,7 +25,7 @@ class CadTests(unittest.TestCase):
         selected = assembler.load_selected(
             assembler.DEFAULT_LIBRARY,
             assembler.DEFAULT_DXF_SOURCES,
-            ['im1-011', 'im1-011'],
+            ['im1-014', 'im1-014'],
         )
         with tempfile.TemporaryDirectory(prefix='l-designations-test-') as directory:
             output = Path(directory) / 'result.dxf'
@@ -79,8 +80,64 @@ class CadTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             api.validate_instances({'instances': [{'id': 'motor', 'code': 'im1-011', 'drawingKind': 'external'}]})
 
+    def test_im1_011_uses_verified_plc_and_terminal_fields(self):
+        channels = [
+            {'family': 'DI24-NPN', 'address': '07', 'commonKey': '#GND1', 'commonDesignation': 'GND1', 'terminals': ['07']},
+            {'family': 'DOR-NO', 'address': 'Q1-1', 'terminals': ['Q1-1', 'Q1-2']},
+        ]
+        instances = [
+            {'id': f'm{index}', 'tag': f'M{index}', 'code': 'im1-011', 'drawingKind': 'electrical',
+             'channels': channels, 'cadHeadRules': [
+                 {'sourceRow': 2, 'code': 'im1-011', 'keyDiagram': 'Imd-3', 'placeholder': '#Process Device Type1', 'value': 'Насос'},
+                 {'sourceRow': 3, 'code': 'im1-011', 'keyDiagram': 'Imd-1', 'placeholder': '#Marking2', 'value': f'Н{index}'},
+                 {'sourceRow': 4, 'code': 'im1-011', 'keyDiagram': 'Imd-2', 'placeholder': '#Device tag', 'value': f'M{index}'},
+             ]}
+            for index in (1, 2)
+        ]
+        selected = assembler.load_selected(assembler.DEFAULT_LIBRARY, assembler.DEFAULT_DXF_SOURCES, ['im1-011'] * 2)
+        with tempfile.TemporaryDirectory(prefix='l-plc-fields-test-') as directory:
+            trace = []
+            output = Path(directory) / 'result.dxf'
+            assembler.assemble(assembler.split_pages(assembler.load_and_validate(selected)), output,
+                               instances=instances, parameter_trace=trace, drawing_kind='electrical')
+            document = ezdxf.readfile(output)
+            self.assertFalse(document.audit().has_errors)
+        fields = {(item['instanceId'], item['fieldId']): item['after'] for item in trace}
+        self.assertEqual(fields['m1', 'terminal.xt1.1'], '1')
+        self.assertEqual(fields['m1', 'terminal.xt1.2'], '2')
+        self.assertEqual(fields['m2', 'terminal.xt1.1'], '3')
+        self.assertEqual(fields['m2', 'terminal.xt1.2'], '4')
+        self.assertEqual(fields['m2', 'device.qf.contact'], 'QF2.1')
+        self.assertEqual(fields['m1', 'plc.di'], '07')
+        self.assertEqual(fields['m1', 'plc.do.1'], 'Q1-1')
+        self.assertEqual(fields['m1', 'plc.do.2'], 'Q1-2')
+        self.assertEqual(fields['m1', 'plc.common'], 'GND1')
+        self.assertEqual(fields['m1', 'header.deviceTag'], 'M1')
+        self.assertEqual(fields['m1', 'header.processDeviceType'], 'Насос')
+        self.assertEqual(fields['m1', 'header.marking'], 'Н1')
+        self.assertFalse(any(item['status'] == 'unresolved' for item in trace))
+        self.assertEqual(next(item['ruleSource'] for item in trace if item['fieldId'] == 'header.marking'), 'diagram head:3')
+        bad_head = copy.deepcopy(instances[0])
+        bad_head['cadHeadRules'][1]['placeholder'] = '#Other'
+        source = ezdxf.readfile(assembler.DEFAULT_DXF_SOURCES / 'im1-011.dxf')
+        source_hash = assembler.load_and_validate(selected)[0][4]
+        with self.assertRaisesRegex(ValueError, 'diagram head'):
+            assembler.apply_template_contract('im1-011', source.modelspace(), source_hash, bad_head, {})
+        with self.assertRaisesRegex(ValueError, 'версия DXF'):
+            assembler.apply_template_contract('im1-011', source.modelspace(), '0' * 64, instances[0], {})
+        with self.assertRaisesRegex(ValueError, 'DI24-NPN'):
+            assembler.apply_template_contract('im1-011',
+                ezdxf.readfile(assembler.DEFAULT_DXF_SOURCES / 'im1-011.dxf').modelspace(),
+                assembler.load_and_validate(selected)[0][4], {'tag': 'M1', 'channels': []}, {})
+        module_instance = copy.deepcopy(instances[0])
+        module_instance['channels'][0]['deviceRef'] = 'M1'
+        with self.assertRaisesRegex(ValueError, 'маркировки вывода модуля'):
+            assembler.apply_template_contract('im1-011',
+                ezdxf.readfile(assembler.DEFAULT_DXF_SOURCES / 'im1-011.dxf').modelspace(),
+                source_hash, module_instance, {})
+
     def test_separate_document_sets_and_multipage_frames(self):
-        instances = api.validate_instances({'instances': [{'id': f'm{index}-{code}', 'tag': f'M{index}', 'code': code} for index in range(8) for code in ['im1-011', 'im2-1']]})
+        instances = api.validate_instances({'instances': [{'id': f'm{index}-{code}', 'tag': f'M{index}', 'code': code} for index in range(8) for code in ['im1-014', 'im2-1']]})
         with tempfile.TemporaryDirectory(prefix='l-sets-test-') as directory:
             root = Path(directory)
             manifest = root / 'manifest.json'
@@ -95,7 +152,7 @@ class CadTests(unittest.TestCase):
                 self.assertTrue(parameterization['fields'])
                 self.assertTrue(all(item['layer'] in {'QF', 'KM', 'KL'} for item in parameterization['fields']))
                 self.assertTrue(all(item['placeholderHandle'] for item in parameterization['fields']))
-            for kind, forbidden in [('electrical', 'im2-1'), ('external', 'im1-011')]:
+            for kind, forbidden in [('electrical', 'im2-1'), ('external', 'im1-014')]:
                 document = ezdxf.readfile(root / f'result-{kind}.dxf')
                 self.assertFalse(document.audit().has_errors)
                 labels = [entity.dxf.text for entity in document.modelspace().query('TEXT') if entity.dxf.text.startswith('DRAFT')]
@@ -114,7 +171,7 @@ class CadTests(unittest.TestCase):
                 api.validate_instances(payload)
 
     def test_repeated_templates_round_trip(self):
-        codes = ['im1-011', 'im2-1', 'im1-011', 'im2-1']
+        codes = ['im1-014', 'im2-1', 'im1-014', 'im2-1']
         selected = assembler.load_selected(assembler.DEFAULT_LIBRARY, assembler.DEFAULT_DXF_SOURCES, codes)
         with tempfile.TemporaryDirectory(prefix='l-cad-test-') as directory:
             output = Path(directory) / 'result.dxf'
