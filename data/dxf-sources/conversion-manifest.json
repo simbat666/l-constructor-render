@@ -56,10 +56,11 @@
     {
       "code": "im1-011",
       "sourceSha256": "8d1ccccfcd8d37ef73045c7bf458c11f4494da13824dd201d6127c5e748397a9",
+      "outputSource": "user-supplied im1-011.dxf (replaces converted DXF)",
       "output": {
         "dxfVersion": "AC1032",
-        "bytes": 273159,
-        "sha256": "7edba17f40753ff662f32bfcabba3ab3e1ad0ea352a1dbfac51145c095009913",
+        "bytes": 273145,
+        "sha256": "716303d5a89312ae4799d2bcd3d26b5fd99fd4f4b4d926ca0b8d731fbbc8bd90",
         "entityCount": 114,
         "auditErrors": 0,
         "extents": [

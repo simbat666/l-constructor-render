@@ -4,6 +4,7 @@ from pathlib import Path
 import tempfile
 import unittest
 import json
+import hashlib
 import zipfile
 import ezdxf
 import sys
@@ -21,6 +22,24 @@ api = module('local_cad_api')
 assembler = module('assemble_dxf_package')
 
 class CadTests(unittest.TestCase):
+    def test_im1_011_source_and_field_contract_match(self):
+        source = ROOT / 'data/dxf-sources/im1-011.dxf'
+        digest = hashlib.sha256(source.read_bytes()).hexdigest()
+        contract = json.loads((ROOT / 'data/cad-template-contracts/im1-011.json').read_text(encoding='utf-8'))
+        manifest = json.loads((ROOT / 'data/dxf-sources/conversion-manifest.json').read_text(encoding='utf-8'))
+        record = next(item for item in manifest['converted'] if item['code'] == 'im1-011')
+        self.assertEqual(contract['sourceSha256'], digest)
+        self.assertEqual(record['output']['sha256'], digest)
+        self.assertEqual(record['output']['bytes'], source.stat().st_size)
+        document = ezdxf.readfile(source)
+        self.assertFalse(document.audit().has_errors)
+        for field in contract['fields']:
+            entity = document.entitydb.get(field['handle'])
+            self.assertIsNotNone(entity)
+            self.assertEqual(entity.dxftype(), 'MTEXT')
+            self.assertEqual(entity.dxf.layer, field['layer'])
+            self.assertEqual(assembler.mtext_plain(entity), field['text'])
+
     def test_device_designations_are_scoped_to_the_full_cabinet(self):
         selected = assembler.load_selected(
             assembler.DEFAULT_LIBRARY,

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceSha256": "7edba17f40753ff662f32bfcabba3ab3e1ad0ea352a1dbfac51145c095009913",
+  "sourceSha256": "716303d5a89312ae4799d2bcd3d26b5fd99fd4f4b4d926ca0b8d731fbbc8bd90",
   "fields": [
     {"handle": "14E7", "layer": "XT7", "text": "#XT1", "role": "terminal.xt1.1"},
     {"handle": "14EA", "layer": "XT7", "text": "#XT2", "role": "terminal.xt1.2"},
