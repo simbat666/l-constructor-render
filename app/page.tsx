@@ -629,9 +629,14 @@ function CabinetApp({ user, project, workspace, onBack, onLogout }: { user: stri
               </div>
             )}
             <div className="mt-5 rounded-2xl bg-[#f4f4f8] p-4 text-xs leading-5 text-[#777786]">
-              I/O распределяются по совместимым выводам ZENTEC M245 для всех
-              двигателей и дополнительных датчиков шкафа. Клеммы XT и связи GND/COM
-              в DXF пока не назначаются.
+              I/O распределяются по ZENTEC M245 и, при нехватке выводов, до пяти
+              тестовых модулей M245 no display для всего шкафа. Клеммы XT и связи
+              GND/COM в DXF пока не назначаются.
+              {cabinet.plcHardware.length > 0 && (
+                <p className="mt-2 font-semibold text-[#403b55]">
+                  Подобрано: {cabinet.plcHardware.map((device) => `${device.ref} — ${device.brand} ${device.model}`).join('; ')}.
+                </p>
+              )}
             </div>
             <div className="mt-5 space-y-3 border-t border-[#e4e4ed] pt-5">
               <h3 className="text-sm font-semibold">Схемы всего шкафа</h3>
@@ -1301,8 +1306,8 @@ function DiagramResult({
       ) : requested && selectedMain ? (
         <>
           <p className="text-sm text-[#747480]">
-            Выбран вариант схемы и назначены выводы ПЛК по таблице ZENTEC M245.
-            Их маркировка в DXF пока не подставляется.
+            Выбран вариант схемы и назначены выводы контроллера и, если нужны, модулей.
+            Обозначение перед номером вывода показывает устройство.
           </p>
           <DiagramTable
             rows={[{ row: selectedMain, sourceOrder: 'I/O optimizer' }]}
@@ -1314,7 +1319,7 @@ function DiagramResult({
               </p>
               <p className="mt-2 font-mono leading-5">
                 {channels
-                  .map((channel) => [channel.terminals.join(' / '), channel.family, channel.commonKey].filter(Boolean).join(' · '))
+                  .map((channel) => [`${channel.deviceRef}:${channel.terminals.join(' / ')}`, channel.family, channel.commonRef].filter(Boolean).join(' · '))
                   .join('\n')}
               </p>
             </div>

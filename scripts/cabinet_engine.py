@@ -78,7 +78,7 @@ def calculate_cabinet(motors):
         dict(d, candidates=[r for r in d['candidates'] if (norm(r.get('controller')), norm(r.get('controllerType'))) == (brand, model)])
         for d in ready])) for brand, model in sorted(common) if (brand, model) == supported]
     valid_plans = [p for p in plans if not p.get('error')]
-    plan = min(valid_plans, key=lambda p: sum(bool(v) for v in p.get('totals', {}).values())) if valid_plans else None
+    plan = min(valid_plans, key=lambda p: (len(p.get('modules', [])), sum(bool(v) for v in p.get('totals', {}).values()))) if valid_plans else None
     errors = [f"{b['tag']}: {e}" for b in blocks for e in b['errors']]
     if allocation_error:
         errors.append(allocation_error)
@@ -94,10 +94,25 @@ def calculate_cabinet(motors):
         else:
             block['optional'].append(dict(row=allocation['scheme'], sourceOrder=demand['id']))
         block['channels'].extend(allocation['channels'])
+        head_answers = {answer['diagramKey']: string(answer['value']) for answer in active_answers(block['state'])
+                        if answer.get('diagramKey')}
+        device_type = head_answers.get('Imd-3')
+        cad_fields = {
+            'processDeviceType': field(block['fields'], 'process.customType') if norm(device_type) == norm('Другой') else device_type,
+            'marking': head_answers.get('Imd-1'),
+            'deviceTag': head_answers.get('Imd-2'),
+        }
         for index, key in enumerate(('diagram1', 'diagram2')):
             code = allocation['scheme'].get(key)
             if code and code.strip():
-                instances.append(dict(drawingKind='electrical' if index == 0 else 'external', id=f"{demand['id']}:{index + 1}", blockId=block['id'], tag=block['tag'], code=code.strip(), source=f"{demand['source']}:{allocation['scheme']['sourceRow']}", channels=allocation['channels']))
+                head_rules = [dict(rule, value=cad_fields[{'Imd-3': 'processDeviceType', 'Imd-1': 'marking', 'Imd-2': 'deviceTag'}[rule['keyDiagram']]])
+                              for rule in BASE.get('diagramHeads', []) if rule['code'] == code.strip()]
+                instances.append(dict(drawingKind='electrical' if index == 0 else 'external', id=f"{demand['id']}:{index + 1}", blockId=block['id'], tag=block['tag'], code=code.strip(), source=f"{demand['source']}:{allocation['scheme']['sourceRow']}", channels=allocation['channels'], cadHeadRules=head_rules))
+    for instance in instances:
+        if instance['code'] == 'im1-011' and instance['drawingKind'] == 'electrical' and any(
+                channel['deviceRef'] != 'PLC' and channel['family'] in ('DI24-NPN', 'DOR-NO')
+                for channel in instance['channels']):
+            errors.append(f"{instance['tag']}: im1-011: для вывода модуля нет проверенного поля обозначения устройства на схеме.")
     for block in blocks:
         if not block.get('main'):
             continue
@@ -165,14 +180,22 @@ def calculate_cabinet(motors):
         if block['loadIndex']:
             outputs.append(dict(id='load-index', title='Индекс нагрузки', detail=block['loadIndex'], source=load_rule['source']))
         if block['channels']:
-            outputs.append(dict(id='io', title='Выводы ПЛК', detail=', '.join(f"{c['address']} · {c['family']}" for c in block['channels'])))
+            outputs.append(dict(id='io', title='Выводы ПЛК', detail=', '.join(f"{c['deviceRef']}:{c['address']} · {c['family']}" for c in block['channels'])))
         for item in block['specification']:
             outputs.append(dict(id=f"spec:{item['source']}:{item['name']}", title=item['name'], detail=f"{fmt(item['quantity'])} {item['unit']}", source=item['source']))
         block['decisionTrace'] = dict(inputs=inputs, rules=rules, outputs=outputs)
+    modules = plan['modules'] if plan else []
     return dict(schemaVersion=1, ruleFingerprint=RULE_FINGERPRINT, status='draft', blocks=blocks, instances=instances, errors=errors, warnings=[
         'DXF — черновая компоновка шаблонов, не выпущенная КД. QF/KM/KL нумеруются, но выводы ПЛК, XT, GND/COM, номиналы и соединения ещё не параметризованы.',
-        'Выводы ZENTEC M245 распределены по таблице ключей ПЛК. Клеммы шкафа XT, подключение GND/COM на CAD и модули расширения ещё не рассчитаны.',
-    ], controllerFamily=plan['controller'] if plan else None, io=plan['totals'] if plan else {}, canExport=bool(motors) and not errors and bool(instances))
+        'Выводы ПЛК и тестовых модулей распределены по таблице ключей. Клеммы шкафа XT и подключение GND/COM на CAD ещё не рассчитаны.',
+        *(['Номера клемм M245 no display в тестовом листе составлены по образцу M245; нужна сверка с паспортом модуля.'] if modules else []),
+    ], controllerFamily=plan['controller'] if plan else None,
+       modules=modules,
+       plcHardware=([dict(ref='PLC', brand=CATALOG['controller']['brand'], model=CATALOG['controller']['model'],
+                          quantity=1, source='base_controller:2')] +
+                    [dict(ref=module['ref'], brand=module['brand'], model=module['model'],
+                          quantity=1, source=module['source']) for module in modules]) if plan else [],
+       io=plan['totals'] if plan else {}, canExport=bool(motors) and not errors and bool(instances))
 
 class RevisionConflict(ValueError):
     pass

@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "sourceSha256": "7edba17f40753ff662f32bfcabba3ab3e1ad0ea352a1dbfac51145c095009913",
+  "fields": [
+    {"handle": "14E7", "layer": "XT7", "text": "#XT1", "role": "terminal.xt1.1"},
+    {"handle": "14EA", "layer": "XT7", "text": "#XT2", "role": "terminal.xt1.2"},
+    {"handle": "14ED", "layer": "Headers", "text": "#Process Device Type", "role": "header.processDeviceType", "diagramKey": "Imd-3", "sourcePlaceholder": "#Process Device Type1", "offsetY": -4.0},
+    {"handle": "1509", "layer": "Слой1", "text": "#KM1.1", "role": "device.km.contact"},
+    {"handle": "150A", "layer": "Слой1", "text": "#QF1", "role": "device.qf.main"},
+    {"handle": "150C", "layer": "XT1", "text": "#GND1", "role": "plc.common"},
+    {"handle": "1523", "layer": "Слой1", "text": "#KM1", "role": "device.km.main"},
+    {"handle": "152C", "layer": "Слой1", "text": "#QF1.1", "role": "device.qf.contact"},
+    {"handle": "152E", "layer": "XT1", "text": "#DI24-NPN", "role": "plc.di"},
+    {"handle": "1531", "layer": "Headers", "text": "#Marking", "role": "header.marking", "diagramKey": "Imd-1", "sourcePlaceholder": "#Marking2", "offsetY": -4.0},
+    {"handle": "1532", "layer": "Headers", "text": "#Device tag", "role": "header.deviceTag", "diagramKey": "Imd-2", "offsetY": -4.0},
+    {"handle": "1538", "layer": "XT1", "text": "#DOR-NO", "role": "plc.do.1"},
+    {"handle": "153A", "layer": "XT1", "text": "#DOR-NO", "role": "plc.do.2"}
+  ]
+}

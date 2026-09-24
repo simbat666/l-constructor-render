@@ -33,6 +33,7 @@ TOP = 280.0
 BOTTOM = 65.0
 PROFILES = ROOT / 'data' / 'drawing-profiles.json'
 FIELD_CONTRACT = ROOT / 'data' / 'cad-field-contract.json'
+TEMPLATE_CONTRACTS = ROOT / 'data' / 'cad-template-contracts'
 
 # A marker is deliberately just a marker: the layer contract determines its
 # engineering meaning.  For example, ``#1`` on layer QF is a circuit breaker,
@@ -140,6 +141,95 @@ def renumber_designations(modelspace, counters, contract):
     return trace
 
 
+def apply_template_contract(code, modelspace, source_sha256, instance, counters):
+    """Apply only fields identified in a verified, versioned CAD template."""
+    path = TEMPLATE_CONTRACTS / f'{code}.json'
+    if not path.is_file():
+        return []
+    contract = json.loads(path.read_text(encoding='utf-8'))
+    if contract.get('schemaVersion') != 1 or contract.get('sourceSha256') != source_sha256:
+        raise ValueError(f'Изменилась версия DXF {code}; требуется повторная проверка полей')
+    fields = contract.get('fields')
+    if not isinstance(fields, list) or len({f['handle'] for f in fields}) != len(fields):
+        raise ValueError(f'Некорректный контракт полей {code}')
+    entities = {}
+    for field in fields:
+        entity = modelspace.doc.entitydb.get(field['handle'])
+        if entity is None or entity.dxftype() != 'MTEXT' or entity.dxf.layer != field['layer'] or mtext_plain(entity) != field['text']:
+            raise ValueError(f'Поле {code}:{field["handle"]} не совпало с проверенным шаблоном')
+        entities[field['handle']] = entity
+
+    channels = instance.get('channels', [])
+    di = [item for item in channels if item.get('family') == 'DI24-NPN']
+    do = [item for item in channels if item.get('family') == 'DOR-NO']
+    if len(di) != 1 or len(do) != 1 or len(do[0].get('terminals', [])) != 2:
+        raise ValueError(f'{code}: требуется ровно один DI24-NPN и один DOR-NO с двумя выводами')
+    if di[0].get('deviceRef', 'PLC') != 'PLC' or do[0].get('deviceRef', 'PLC') != 'PLC':
+        raise ValueError(f'{code}: нет проверенной маркировки вывода модуля на CAD-шаблоне')
+    if (di[0].get('commonKey') != '#GND1' or di[0].get('commonDesignation') != 'GND1'
+            or not di[0].get('address')):
+        raise ValueError(f'{code}: не подтверждена группа GND1 и клемма DI24-NPN')
+    head_rules = instance.get('cadHeadRules')
+    if not isinstance(head_rules, list) or len(head_rules) != 3:
+        raise ValueError(f'{code}: нет трёх правил diagram head из ОЛ')
+    head_by_key = {rule.get('keyDiagram'): rule for rule in head_rules}
+    if len(head_by_key) != 3:
+        raise ValueError(f'{code}: повтор ключа diagram head')
+
+    # The source has one QF and one KM. Contacts share their device numbers.
+    numbers = {prefix: counters.get(prefix, 0) + 1 for prefix in ('QF', 'KM')}
+    for prefix, number in numbers.items():
+        counters[prefix] = number
+    first_terminal = counters.get('XT1', 0) + 1
+    counters['XT1'] = first_terminal + 1
+    values = {
+        'terminal.xt1.1': str(first_terminal),
+        'terminal.xt1.2': str(first_terminal + 1),
+        'device.qf.main': f"QF{numbers['QF']}",
+        'device.qf.contact': f"QF{numbers['QF']}.1",
+        'device.km.main': f"KM{numbers['KM']}",
+        'device.km.contact': f"KM{numbers['KM']}.1",
+        'plc.common': di[0]['commonDesignation'],
+        'plc.di': str(di[0]['address']),
+        'plc.do.1': str(do[0]['terminals'][0]),
+        'plc.do.2': str(do[0]['terminals'][1]),
+    }
+    for field in fields:
+        key = field.get('diagramKey')
+        if not key:
+            continue
+        rule = head_by_key.get(key)
+        if not rule or rule.get('code') != code or rule.get('placeholder') != field.get('sourcePlaceholder', field['text']):
+            raise ValueError(f'{code}: ключ {key} в diagram head не соответствует проверенному полю DXF')
+        value = rule.get('value')
+        if value is not None:
+            if not isinstance(value, str) or not value.strip() or len(value) > 100 or any(ord(c) < 32 for c in value):
+                raise ValueError(f'{code}: некорректное значение {key}')
+            values[field['role']] = value.strip()
+    trace = []
+    for field in fields:
+        before = field['text']
+        after = values.get(field['role'], before)
+        unresolved = field['role'].startswith('header.') and field['role'] not in values
+        if not unresolved and field['role'] not in values:
+            raise ValueError(f'{code}: неизвестная роль поля {field["role"]}')
+        entity = entities[field['handle']]
+        if after != before:
+            entity.text = entity.text.replace(before, after)
+        if field.get('offsetY'):
+            position = entity.dxf.insert
+            entity.dxf.insert = (position.x, position.y + field['offsetY'], position.z)
+        trace.append({
+            'fieldId': field['role'], 'layer': field['layer'],
+            'before': before, 'after': after,
+            'placeholderHandle': field['handle'],
+            'offsetY': field.get('offsetY', 0),
+            'status': 'unresolved' if unresolved else 'applied',
+            'ruleSource': f"diagram head:{head_by_key[field['diagramKey']]['sourceRow']}" if field.get('diagramKey') else None,
+        })
+    return trace
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Assemble selected scheme DXFs into one package")
     parser.add_argument("codes", nargs="*", help="Template occurrences in page order (repetition is allowed)")
@@ -188,7 +278,7 @@ def load_and_validate(selected: list[tuple[str, Path]], profile=None):
             raise ValueError(f"DXF-блок {code} не помещается в область A3")
         if profile and (extents.extmin.y - profile['sourceOriginY'] + profile['verticalOffset'] < profile['bottom'] or extents.extmax.y - profile['sourceOriginY'] + profile['verticalOffset'] > profile['top']):
             raise ValueError(f'Неверная вертикальная привязка {code}: нужен контракт координат шаблона')
-        prepared.append((code, document, modelspace, extents))
+        prepared.append((code, document, modelspace, extents, hashlib.sha256(path.read_bytes()).hexdigest()))
     return prepared
 
 
@@ -253,10 +343,13 @@ def assemble(pages, output: Path, instances=None, profile=None, parameter_trace=
         if profile:
             add_frame(target, profile, page_index, len(pages), page_x)
         cursor_x = page_x + (profile['left'] if profile else LEFT)
-        for code, source_doc, source_msp, extents in page:
+        for code, source_doc, source_msp, extents, source_sha256 in page:
             occurrence += 1
             instance = instances[occurrence - 1] if instances else {"tag": "", "id": str(occurrence)}
-            applied_fields = renumber_designations(source_msp, designation_counters, field_contract)
+            if (TEMPLATE_CONTRACTS / f'{code}.json').is_file():
+                applied_fields = apply_template_contract(code, source_msp, source_sha256, instance, designation_counters)
+            else:
+                applied_fields = renumber_designations(source_msp, designation_counters, field_contract)
             if parameter_trace is not None:
                 for field in applied_fields:
                     parameter_trace.append({
@@ -345,7 +438,7 @@ def build_bundle(instances, output, manifest, library=DEFAULT_LIBRARY, sources=D
         for path in files:
             archive.write(path, path.name)
         archive.write(package_manifest, 'manifest.json')
-    print('Комплект DRAFT: типы схем разделены. Нумерация QF/KM/KL применена по слоям и записана в manifest; соединения, клеммы и штампы ещё требуют инженерного контракта.')
+    print('Комплект DRAFT: типы схем разделены. Применённые и неразрешённые поля записаны в manifest; связи и штампы ещё требуют инженерного контракта.')
 
 
 if __name__ == "__main__":

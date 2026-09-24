@@ -19,7 +19,7 @@ from openpyxl import load_workbook
 
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_SOURCE = ROOT / "data" / "rules-source" / "ОЛ - Электродвигатель асинхронный_В2 [ldYljg].xlsx"
+DEFAULT_SOURCE = ROOT / "data" / "rules-source" / "ОЛ - Электродвигатель асинхронный_В2 [nsCQfC].xlsx"
 DEFAULT_TARGET = ROOT / "data" / "motor-v2.json"
 
 
@@ -61,6 +61,7 @@ def question_rows(ws) -> list[dict[str, object]]:
 
     required_column = columns.get("Required field")
     engine_key_column = columns.get("Engine key")
+    diagram_key_column = columns.get("key_diagram")
     result = []
     for source_row, row in enumerate(rows(ws)[1:], start=2):
         if row[columns["order"]] is None:
@@ -80,6 +81,7 @@ def question_rows(ws) -> list[dict[str, object]]:
             "fieldType": field_type,
             "inputRule": input_rule,
             "engineKey": value(row[engine_key_column]) if engine_key_column is not None else None,
+            "diagramKey": value(row[diagram_key_column]) if diagram_key_column is not None else None,
             "required": bool(value(row[required_column])) if required_column is not None else False,
         })
     return result
@@ -152,6 +154,22 @@ def main():
     questions3 = question_rows(book["Ques 3"])
     questions4 = question_rows(book["Ques 4"])
     validate_question_graph([questions1, questions2, questions3, questions4])
+
+    heads = []
+    head_sheet = book['diagram head']
+    head_columns = required_columns(head_sheet, ['electrical diagram 1', 'Ключ на схеме Э3', 'key_diagram'])
+    known_keys = {node['diagramKey'] for node in questions1 + questions2 + questions3 + questions4 if node['diagramKey']}
+    for source_row, row in enumerate(rows(head_sheet)[1:], start=2):
+        code = cell(row, head_columns, 'electrical diagram 1')
+        if not code:
+            continue
+        placeholder = cell(row, head_columns, 'Ключ на схеме Э3')
+        key = cell(row, head_columns, 'key_diagram')
+        if not isinstance(placeholder, str) or not placeholder.startswith('#') or key not in known_keys:
+            raise ValueError(f'diagram head:{source_row}: неверный ключ или поле схемы')
+        if any(item['code'] == code and item['keyDiagram'] == key for item in heads):
+            raise ValueError(f'diagram head:{source_row}: повтор ключа {key} для {code}')
+        heads.append({'sourceRow': source_row, 'code': code, 'placeholder': placeholder, 'keyDiagram': key})
 
     index1 = []
     for excel_row, row in enumerate(rows(book["Load index 1"])[1:], start=2):
@@ -247,8 +265,9 @@ def main():
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(json.dumps({
         "rulesSchemaVersion": 3,
-        "source": {"file": source.name, "revision": args.revision or source.stem, "sha256": hashlib.sha256(source.read_bytes()).hexdigest(), "sheets": ["Ques 1", "Ques 2", "Ques 3", "Ques 4", "Load index 1", "Load index 2", "diagram 1", "diagram 2", "sp1", "sp2", "sp3", "sp4"]},
+        "source": {"file": source.name, "revision": args.revision or source.stem, "sha256": hashlib.sha256(source.read_bytes()).hexdigest(), "sheets": ["Ques 1", "Ques 2", "Ques 3", "Ques 4", "diagram head", "Load index 1", "Load index 2", "diagram 1", "diagram 2", "sp1", "sp2", "sp3", "sp4"]},
         "questions1": questions1, "questions2": questions2, "questions3": questions3, "questions4": questions4, "loadIndex1": index1, "loadIndex2": index2, "diagrams1": diagrams1, "diagrams2": diagrams2,
+        "diagramHeads": heads,
         "manualVfd": manualVfd, "automaticVfd": automaticVfd, "sensorSpecification": sensorSpecification, "mainSpecification": mainSpecification,
     }, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     print(f"Wrote {target} | questions {len(questions1)}/{len(questions2)}/{len(questions3)}/{len(questions4)} | diagrams {len(diagrams1)}/{len(diagrams2)}")

@@ -1,10 +1,50 @@
 {
   "schemaVersion": 1,
   "fields": [
-    {"id": "device.qf.designation", "kind": "deviceDesignation", "layer": "QF", "prefix": "QF", "placeholder": "#N or #N.M", "numbering": "cabinetWide", "enabled": true},
-    {"id": "device.km.designation", "kind": "deviceDesignation", "layer": "KM", "prefix": "KM", "placeholder": "#N or #N.M", "numbering": "cabinetWide", "enabled": true},
-    {"id": "device.kl.designation", "kind": "deviceDesignation", "layer": "KL", "prefix": "KL", "placeholder": "#N or #N.M", "numbering": "cabinetWide", "enabled": true},
-    {"id": "terminal.xt", "kind": "terminalDesignation", "layer": "XT*", "placeholder": "#N or #N.M", "numbering": "unassigned", "enabled": false, "reason": "Terminal assignment requires a verified connection and terminal-strip contract."},
-    {"id": "title-block.headers", "kind": "titleOrHeaderField", "layer": "Headers", "placeholder": "#N or #N.M", "numbering": "unassigned", "enabled": false, "reason": "Header fields need an explicit document-field mapping."}
+    {
+      "id": "device.qf.designation",
+      "kind": "deviceDesignation",
+      "layer": "QF",
+      "prefix": "QF",
+      "placeholder": "#N or #N.M",
+      "numbering": "cabinetWide",
+      "enabled": true
+    },
+    {
+      "id": "device.km.designation",
+      "kind": "deviceDesignation",
+      "layer": "KM",
+      "prefix": "KM",
+      "placeholder": "#N or #N.M",
+      "numbering": "cabinetWide",
+      "enabled": true
+    },
+    {
+      "id": "device.kl.designation",
+      "kind": "deviceDesignation",
+      "layer": "KL",
+      "prefix": "KL",
+      "placeholder": "#N or #N.M",
+      "numbering": "cabinetWide",
+      "enabled": true
+    },
+    {
+      "id": "terminal.xt",
+      "kind": "terminalDesignation",
+      "layer": "XT*",
+      "placeholder": "#N or #N.M",
+      "numbering": "unassigned",
+      "enabled": false,
+      "reason": "Terminal assignment requires a verified connection and terminal-strip contract."
+    },
+    {
+      "id": "title-block.headers",
+      "kind": "titleOrHeaderField",
+      "layer": "Headers",
+      "placeholder": "#N or #N.M",
+      "numbering": "unassigned",
+      "enabled": false,
+      "reason": "Header fields need an explicit document-field mapping."
+    }
   ]
 }

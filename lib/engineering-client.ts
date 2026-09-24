@@ -19,7 +19,8 @@ type TraceEntry = { id: string; title: string; detail: string; source?: string }
 type SchemeRow = Record<string, any>;
 export type Channel = {
   family: string; address: string; terminals: string[]; group: string;
-  commonKey: string | null; source: string;
+  deviceRef: string; terminalStatus: 'source' | 'testDerived';
+  commonKey: string | null; commonRef: string | null; source: string;
 };
 export type Calculation = {
   schemaVersion: number; ruleFingerprint: string; status: string;
@@ -30,11 +31,14 @@ export type Calculation = {
     decisionTrace: { inputs: TraceEntry[]; rules: TraceEntry[]; outputs: TraceEntry[] };
   }>;
   instances: Array<{id: string; blockId: string; tag: string; code: string; source: string; drawingKind: string; channels: Channel[]}>;
-  errors: string[]; warnings: string[]; controllerFamily: string | null; io: Record<string, number>; canExport: boolean;
+  errors: string[]; warnings: string[]; controllerFamily: string | null;
+  modules: Array<{ref: string; brand: string; model: string; source: string; terminalStatus: string}>;
+  plcHardware: Array<{ref: string; brand: string; model: string; quantity: number; source: string}>;
+  io: Record<string, number>; canExport: boolean;
 };
 type ResponseData = {calculation: Calculation; forms: Record<string, VisibleGroup[]>; revision: string};
 export const initialQuestionnaireState: QuestionnaireState = {selected: {}, inputs: {}, checks: {}, uploads: {}};
-const empty: Calculation = {schemaVersion: 1, ruleFingerprint: '', status: 'draft', blocks: [], instances: [], errors: [], warnings: [], controllerFamily: null, io: {}, canExport: false};
+const empty: Calculation = {schemaVersion: 1, ruleFingerprint: '', status: 'draft', blocks: [], instances: [], errors: [], warnings: [], controllerFamily: null, modules: [], plcHardware: [], io: {}, canExport: false};
 
 /** Used only to choose HTML input attributes from a server-returned field. */
 export function numericInputRule(rule: string | null) {
