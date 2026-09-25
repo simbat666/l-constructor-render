@@ -340,12 +340,10 @@ def split_pages(prepared, profile=None):
     pages, current, used_width = [], [], 0.0
     available_width = profile['right'] - profile['left'] if profile else RIGHT - LEFT
     for source in prepared:
-        if profile and template_placement(source[0], source[2]):
-            if current:
-                pages.append(current)
-                current, used_width = [], 0.0
-            pages.append([source])
-            continue
+        anchored = bool(profile and template_placement(source[0], source[2]))
+        if current and anchored != bool(profile and template_placement(current[0][0], current[0][2])):
+            pages.append(current)
+            current, used_width = [], 0.0
         width = source[3].size.x
         gap = profile['gap'] if profile else 0
         if current and used_width + gap + width > available_width + 0.001:
@@ -358,6 +356,38 @@ def split_pages(prepared, profile=None):
     if current:
         pages.append(current)
     return pages
+
+
+def add_module_schedule(modelspace, page_x, module, instances):
+    """Show calculated module assignments without claiming a verified module schematic."""
+    rows = []
+    for instance in instances:
+        for channel in instance.get('channels', []):
+            if channel.get('deviceRef') != module['ref']:
+                continue
+            terminals = channel.get('terminals')
+            if not isinstance(terminals, list) or not terminals or not all(isinstance(t, str) and t for t in terminals):
+                raise ValueError(f"{module['ref']}: не заданы назначенные клеммы канала")
+            rows.append((instance.get('tag', ''), channel.get('family', ''), ', '.join(terminals),
+                         channel.get('commonDesignation') or '—'))
+    if not rows:
+        raise ValueError(f"{module['ref']}: лист модуля без назначенных сигналов")
+    if len(rows) > 24:
+        raise ValueError(f"{module['ref']}: назначения не помещаются на лист A3")
+    def label(value, x, y, height=2.5):
+        modelspace.add_text(str(value), dxfattribs={'insert': (page_x + x, y), 'height': height,
+                                                    'layer': 'L-MODULE-SCHEDULE'})
+    label(f"ДОП. МОДУЛЬ {module['ref']} / {module['brand']} {module['model']}", 55, 271, 3.5)
+    label('НАЗНАЧЕННЫЕ ВХОДЫ И ВЫХОДЫ / ДЛЯ СВЕРКИ', 55, 258, 2.5)
+    label('Блок', 55, 244)
+    label('Сигнал', 102, 244)
+    label(f"Клеммы {module['ref']}", 218, 244)
+    label('Общий', 325, 244)
+    for index, (tag, family, terminals, common) in enumerate(rows):
+        y = 232 - index * 7
+        for value, x in ((tag, 55), (family, 102), (terminals, 218), (common, 325)):
+            label(value, x, y)
+    label('Клеммы модуля: тестовые данные каталога, требуется сверка с паспортом.', 55, 48, 2.0)
 
 
 def add_frame(target, profile, page_index, page_count, page_x):
@@ -398,6 +428,7 @@ def assemble(pages, output: Path, instances=None, profile=None, parameter_trace=
     target_msp = target.modelspace()
     occurrence = 0
     designation_counters = {}
+    seen_commons = set()
     field_contract = load_field_contract()
     module_sheets = module_sheets or []
     if module_sheets and (not profile or drawing_kind != 'electrical'):
@@ -409,20 +440,40 @@ def assemble(pages, output: Path, instances=None, profile=None, parameter_trace=
             add_frame(target, profile, page_index, len(all_pages), page_x)
         if page_index >= len(pages):
             module = module_sheets[page_index - len(pages)]
-            target_msp.add_text(
-                f"ДОП. МОДУЛЬ {module['ref']} / {module['brand']} {module['model']} / DRAFT",
-                dxfattribs={'insert': (page_x + 40, 278), 'height': 2.0})
-            target_msp.add_text(
-                'Геометрия и клеммы модуля не заданы в CAD-шаблоне.',
-                dxfattribs={'insert': (page_x + 40, 268), 'height': 2.0})
+            add_module_schedule(target_msp, page_x, module, instances or [])
             continue
         cursor_x = page_x + (profile['left'] if profile else LEFT)
+        if profile and page and all(template_placement(code, source_msp) for code, _, source_msp, _, _ in page):
+            packed_width = sum(item[3].size.x for item in page) + profile['gap'] * (len(page) - 1)
+            cursor_x += ((profile['right'] - profile['left']) - packed_width) / 2
         for code, source_doc, source_msp, extents, source_sha256 in page:
             occurrence += 1
             instance = instances[occurrence - 1] if instances else {"tag": "", "id": str(occurrence)}
             placement = template_placement(code, source_msp) if profile else None
             if (TEMPLATE_CONTRACTS / f'{code}.json').is_file():
                 applied_fields = apply_template_contract(code, source_msp, source_sha256, instance, designation_counters)
+                for field in applied_fields:
+                    if field['fieldId'] not in ('plc.inputCommon', 'plc.outputCommon'):
+                        continue
+                    if field['assignedModule']:
+                        source_msp.delete_entity(source_doc.entitydb[field['placeholderHandle']])
+                        field['after'] = ''
+                        field['status'] = 'suppressedModuleCommon'
+                        continue
+                    if field['status'] != 'applied':
+                        continue
+                    common = field['after']
+                    matching = [channel for channel in instance.get('channels', [])
+                                if channel.get('commonDesignation') == common and channel.get('deviceRef', 'PLC') == 'PLC']
+                    if not matching:
+                        continue
+                    key = ('PLC', common)
+                    if key in seen_commons:
+                        source_msp.delete_entity(source_doc.entitydb[field['placeholderHandle']])
+                        field['after'] = ''
+                        field['status'] = 'suppressedSharedCommon'
+                    else:
+                        seen_commons.add(key)
             else:
                 applied_fields = renumber_designations(source_msp, designation_counters, field_contract)
             if parameter_trace is not None:
@@ -434,7 +485,7 @@ def assemble(pages, output: Path, instances=None, profile=None, parameter_trace=
                         'sourceCode': code,
                     })
             if placement:
-                dx = page_x + placement['x'] - placement['anchor'].x
+                dx = cursor_x - extents.extmin.x
                 dy = placement['y'] - placement['anchor'].y
             else:
                 dx = cursor_x - extents.extmin.x

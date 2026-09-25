@@ -30,13 +30,42 @@ def im1_014_channels():
     ]
 
 class CadTests(unittest.TestCase):
+    def test_repeated_motor_sheets_pack_and_keep_one_common_label(self):
+        profile = json.loads(assembler.PROFILES.read_text(encoding='utf-8'))['electrical']
+        codes = ['im1-012'] * 4
+        selected = assembler.load_selected(assembler.DEFAULT_LIBRARY, assembler.DEFAULT_DXF_SOURCES, codes)
+        pages = assembler.split_pages(assembler.load_and_validate(selected, profile), profile)
+        self.assertEqual([len(page) for page in pages], [3, 1])
+        instances = [dict(id=f'm{index}', tag=f'M{index}', channels=[
+            dict(family='DI24-PNP', address=f'{index:02d}', terminals=[f'{index:02d}'],
+                 deviceRef='PLC', commonDesignation='GND1'),
+            dict(family='DOR-NO', address=f'Q{index}-1', terminals=[f'Q{index}-1', f'Q{index}-2'],
+                 deviceRef='PLC')], cadHeadRules=[]) for index in range(1, 5)]
+        with tempfile.TemporaryDirectory(prefix='l-packed-motors-') as directory:
+            output = Path(directory) / 'packed.dxf'
+            trace = []
+            assembler.assemble(pages, output, instances=instances, profile=profile, parameter_trace=trace)
+            document = ezdxf.readfile(output)
+            self.assertFalse(document.audit().has_errors)
+            commons = [entity for entity in document.modelspace().query('MTEXT')
+                       if entity.plain_text().strip() == 'GND1']
+            self.assertEqual(len(commons), 1)
+            suppressed = [field for field in trace if field['status'] == 'suppressedSharedCommon']
+            self.assertEqual(len(suppressed), 3)
+            anchors = [entity.dxf.insert for entity in document.modelspace().query('MTEXT')
+                       if entity.plain_text().strip() == 'ХТ1']
+            self.assertEqual(len(anchors), 4)
+            self.assertAlmostEqual(anchors[0].y, anchors[1].y)
+            self.assertAlmostEqual(anchors[1].y, anchors[2].y)
+            self.assertTrue(anchors[0].x < anchors[1].x < anchors[2].x)
+
     def test_new_motor_templates_keep_the_old_sheet_anchor(self):
         profile = json.loads(assembler.PROFILES.read_text(encoding='utf-8'))['electrical']
         codes = ['im1-011', 'im1-012', 'im1-013', 'im1-014']
         selected = assembler.load_selected(assembler.DEFAULT_LIBRARY, assembler.DEFAULT_DXF_SOURCES, codes)
         prepared = assembler.load_and_validate(selected, profile)
         pages = assembler.split_pages(prepared, profile)
-        self.assertEqual([[item[0] for item in page] for page in pages], [[code] for code in codes])
+        self.assertEqual([[item[0] for item in page] for page in pages], [codes[:3], codes[3:]])
         for index, page in enumerate(pages):
             code, _, modelspace, _, _ = page[0]
             placement = assembler.template_placement(code, modelspace)
@@ -63,12 +92,13 @@ class CadTests(unittest.TestCase):
                                                   (2, 'Imd-3', '#Process Device Type1', 'Насос'),
                                                   (3, 'Imd-1', '#Marking2', 'M1'),
                                                   (4, 'Imd-2', '#Device tag', 'M1'))] if code == 'im1-011' else [])
-                assembler.assemble([page], output, [instance], profile=profile)
+                assembler.assemble([[page[0]]], output, [instance], profile=profile)
                 document = ezdxf.readfile(output)
                 self.assertFalse(document.audit().has_errors)
                 placed = [e for e in document.modelspace().query('MTEXT') if e.plain_text().strip() == 'ХТ1']
                 self.assertEqual(len(placed), 1)
-                self.assertAlmostEqual(placed[0].dxf.insert.x, 146.83, places=2)
+                expected_x = profile['left'] + ((profile['right'] - profile['left']) - page[0][3].size.x) / 2
+                self.assertAlmostEqual(placed[0].dxf.insert.x, expected_x, places=2)
                 self.assertAlmostEqual(placed[0].dxf.insert.y, 72.52, places=2)
 
     def test_four_user_supplied_variants_match_sources_and_io(self):
@@ -280,7 +310,10 @@ class CadTests(unittest.TestCase):
             document = ezdxf.readfile(root / 'result-electrical.dxf')
             self.assertFalse(document.audit().has_errors)
             labels = [item.dxf.text for item in document.modelspace().query('TEXT')]
-            self.assertTrue(any('ДОП. МОДУЛЬ M1' in label for label in labels))
+            self.assertTrue(any('M1 / ZENTEC M245 no display' in label for label in labels))
+            self.assertTrue(any('Клеммы M1' in label for label in labels))
+            self.assertTrue(any('Q1-1, Q1-2' in label for label in labels))
+            self.assertTrue(any('M6' in label for label in labels))
             frame_numbers = [item for item in document.modelspace().query('MTEXT') if item.plain_text().strip() in ('1', '2')]
             self.assertGreaterEqual(len(frame_numbers), 2)
             package = json.loads((root / 'result-manifest.json').read_text(encoding='utf-8'))
@@ -290,6 +323,24 @@ class CadTests(unittest.TestCase):
             self.assertEqual(unresolved['plc.do.1']['assignedModule'], 'M1')
             self.assertEqual(unresolved['plc.do.2']['assignedModule'], 'M1')
             self.assertNotIn('plc.di', unresolved)
+
+    def test_module_common_marker_is_hidden_on_motor_sheet(self):
+        selected = assembler.load_selected(assembler.DEFAULT_LIBRARY, assembler.DEFAULT_DXF_SOURCES, ['im1-012'])
+        profile = json.loads(assembler.PROFILES.read_text(encoding='utf-8'))['electrical']
+        pages = assembler.split_pages(assembler.load_and_validate(selected, profile), profile)
+        instance = dict(id='motor-1', tag='М1', channels=[
+            dict(family='DI24-PNP', address='01', terminals=['01'], deviceRef='M1', commonDesignation='GND1'),
+            dict(family='DOR-NO', address='Q1-1', terminals=['Q1-1', 'Q1-2'], deviceRef='PLC')],
+            cadHeadRules=[])
+        with tempfile.TemporaryDirectory(prefix='l-module-common-') as directory:
+            output = Path(directory) / 'result.dxf'
+            trace = []
+            assembler.assemble(pages, output, [instance], profile=profile, parameter_trace=trace)
+            document = ezdxf.readfile(output)
+            self.assertFalse(document.audit().has_errors)
+            self.assertFalse(any(e.plain_text().strip() == '#GND1' for e in document.modelspace().query('MTEXT')))
+            self.assertTrue(any(field['status'] == 'suppressedModuleCommon' and field['assignedModule'] == 'M1'
+                                for field in trace))
 
     def test_separate_document_sets_and_multipage_frames(self):
         instances = api.validate_instances({'instances': [
