@@ -34,6 +34,7 @@ BOTTOM = 65.0
 PROFILES = ROOT / 'data' / 'drawing-profiles.json'
 FIELD_CONTRACT = ROOT / 'data' / 'cad-field-contract.json'
 TEMPLATE_CONTRACTS = ROOT / 'data' / 'cad-template-contracts'
+PLC_CATALOG = ROOT / 'data' / 'plc-catalog.json'
 
 # A marker is deliberately just a marker: the layer contract determines its
 # engineering meaning.  For example, ``#1`` on layer QF is a circuit breaker,
@@ -147,7 +148,7 @@ def apply_template_contract(code, modelspace, source_sha256, instance, counters)
     if not path.is_file():
         return []
     contract = json.loads(path.read_text(encoding='utf-8'))
-    if contract.get('schemaVersion') != 1 or contract.get('sourceSha256') != source_sha256:
+    if contract.get('schemaVersion') != 2 or contract.get('sourceSha256') != source_sha256:
         raise ValueError(f'Изменилась версия DXF {code}; требуется повторная проверка полей')
     fields = contract.get('fields')
     if not isinstance(fields, list) or len({f['handle'] for f in fields}) != len(fields):
@@ -159,20 +160,46 @@ def apply_template_contract(code, modelspace, source_sha256, instance, counters)
             raise ValueError(f'Поле {code}:{field["handle"]} не совпало с проверенным шаблоном')
         entities[field['handle']] = entity
 
-    input_family = contract.get('inputFamily')
-    output_family = contract.get('outputFamily')
-    if input_family not in ('DI24-NPN', 'DI24-PNP') or output_family not in ('DOR-NO', 'DOT-PNP'):
-        raise ValueError(f'{code}: не задан проверенный тип входа и выхода')
+    catalog = json.loads(PLC_CATALOG.read_text(encoding='utf-8'))
+    bindings = catalog.get('templateFields', {}).get(code, [])
+    by_role = {item['role']: item for item in bindings}
+    plc_fields = [field for field in fields if field['role'].startswith('plc.')]
+    if len(by_role) != len(plc_fields) or {field['role'] for field in plc_fields} != set(by_role):
+        raise ValueError(f'{code}: таблица полей CAD не соответствует шаблону')
+    for field in plc_fields:
+        if by_role[field['role']]['marker'] != field['text']:
+            raise ValueError(f'{code}: ключ {field["role"]} в Excel не совпал с DXF')
+    signals = contract['signals']
     channels = instance.get('channels', [])
-    di = [item for item in channels if item.get('family') == input_family]
-    do = [item for item in channels if item.get('family') == output_family]
-    expected_output_terminals = 2 if output_family == 'DOR-NO' else 1
+    di = [item for item in channels if item.get('family') == signals['di']]
+    do = [item for item in channels if item.get('family') == signals['do']]
+    expected_output_terminals = 2 if 'plc.do.2' in by_role else 1
     if len(di) != 1 or len(do) != 1 or len(do[0].get('terminals', [])) != expected_output_terminals:
-        raise ValueError(f'{code}: требуется один {input_family} и один {output_family}')
+        raise ValueError(f'{code}: требуется один {signals["di"]} и один {signals["do"]}')
+    for channel in (di[0], do[0]):
+        if channel.get('deviceRef', 'PLC') != 'PLC':
+            continue  # The separate module schedule carries this assignment.
+        common = channel.get('commonDesignation')
+        common_key = channel.get('commonKey') or ('#' + common if common else None)
+        if common and common_key != '#' + common:
+            raise ValueError(f'{code}: обозначение общего вывода не соответствует выбранной строке ПЛК')
+        matched_rows = [option for option in catalog['pinOptions']
+                        if option['code'] == channel['family']
+                        and option['terminals'] == channel.get('terminals')
+                        and option['commonDesignation'] == common
+                        and option['commonKey'] == common_key]
+        if len(matched_rows) != 1 or channel.get('address') != matched_rows[0]['terminals'][0]:
+            raise ValueError(f'{code}: пара вывод/GND для {channel["family"]} отсутствует в таблице ПЛК')
     if not di[0].get('commonDesignation') or not di[0].get('address'):
-        raise ValueError(f'{code}: не подтверждены общий вывод и клемма {input_family}')
-    if output_family == 'DOT-PNP' and not do[0].get('commonDesignation'):
-        raise ValueError(f'{code}: не подтверждён общий вывод {output_family}')
+        raise ValueError(f'{code}: не подтверждены общий вывод и клемма {signals["di"]}')
+    if 'plc.do.common' in by_role and not do[0].get('commonDesignation'):
+        raise ValueError(f'{code}: не подтверждён общий вывод {signals["do"]}')
+    for role, channel in (('plc.di', di[0]), ('plc.common', di[0]), ('plc.do.1', do[0])):
+        if by_role[role]['signal'] != channel['family']:
+            raise ValueError(f'{code}: строка {role} ссылается на другой тип сигнала')
+    for role in ('plc.do.2', 'plc.do.common'):
+        if role in by_role and by_role[role]['signal'] != do[0]['family']:
+            raise ValueError(f'{code}: строка {role} ссылается на другой тип сигнала')
     head_rules = instance.get('cadHeadRules')
     if not isinstance(head_rules, list) or (contract.get('requireDiagramHead') and len(head_rules) != 3):
         raise ValueError(f'{code}: нет трёх правил diagram head из ОЛ')
@@ -193,21 +220,25 @@ def apply_template_contract(code, modelspace, source_sha256, instance, counters)
         'device.qf.contact': f"QF{numbers['QF']}.1",
         'device.km.main': f"KM{numbers['KM']}",
         'device.km.contact': f"KM{numbers['KM']}.1",
-        'plc.inputCommon': di[0]['commonDesignation'],
-        'plc.di': str(di[0]['address']),
-        'plc.do.1': str(do[0]['terminals'][0]),
     }
-    if output_family == 'DOR-NO':
-        values['plc.do.2'] = str(do[0]['terminals'][1])
-    else:
-        values['plc.outputCommon'] = do[0]['commonDesignation']
+    for role, binding in by_role.items():
+        channel = di[0] if role in ('plc.di', 'plc.common') else do[0]
+        source_column = binding['valueFrom']
+        if source_column == 'CND_COM':
+            value = channel.get('commonDesignation')
+        else:
+            terminal_index = int(source_column.rsplit(' ', 1)[1]) - 1
+            value = channel['terminals'][terminal_index] if terminal_index < len(channel['terminals']) else None
+        if not value:
+            raise ValueError(f'{code}: для роли {role} нет значения {source_column} в выбранной строке ПЛК')
+        values[role] = str(value)
     module_fields = {}
     if di[0].get('deviceRef', 'PLC') != 'PLC':
-        module_fields.update({'plc.inputCommon': di[0]['deviceRef'], 'plc.di': di[0]['deviceRef']})
+        module_fields.update({'plc.common': di[0]['deviceRef'], 'plc.di': di[0]['deviceRef']})
     if do[0].get('deviceRef', 'PLC') != 'PLC':
         module_fields.update({role: do[0]['deviceRef'] for role in
-                              (('plc.do.1', 'plc.do.2') if output_family == 'DOR-NO'
-                               else ('plc.do.1', 'plc.outputCommon'))})
+                              (('plc.do.1', 'plc.do.2') if 'plc.do.2' in by_role
+                               else ('plc.do.1', 'plc.do.common'))})
     for field in fields:
         key = field.get('diagramKey')
         if not key:
@@ -259,6 +290,48 @@ def apply_template_contract(code, modelspace, source_sha256, instance, counters)
                            if field.get('diagramKey') and contract.get('headerSource') == 'questionnaire' else None),
         })
     return trace
+
+
+def merge_repeated_commons(code, modelspace, applied_fields, visible_commons, instance_id):
+    """Keep one complete, isolated common branch per PLC/common on a page.
+
+    The source-locked contract names the exact label, box, vertical conductor,
+    and lower endpoint.  A duplicate is removed as a whole; other wires in the
+    fragment are never shortened or inferred from nearby text.
+    """
+    path = TEMPLATE_CONTRACTS / f'{code}.json'
+    contract = json.loads(path.read_text(encoding='utf-8'))
+    branches = contract.get('commonBranches', {})
+    removed = 0
+    common_fields = [field for field in applied_fields if field['fieldId'] in branches]
+    # A native #GND3 branch is clearer than a #GND1 branch renamed to GND3.
+    # Keep the native branch when two different signals share this common.
+    common_fields.sort(key=lambda field: field['before'] != '#' + field['after'])
+    for field in common_fields:
+        role = field['fieldId']
+        module_ref = field.get('assignedModule')
+        if not module_ref:
+            key = ('PLC', field['after'])
+            if key not in visible_commons:
+                visible_commons[key] = {'sourceCode': code, 'role': role, 'instanceId': instance_id}
+                continue
+        handles = branches[role]
+        if len(handles) != 5 or handles[0] != field['placeholderHandle']:
+            raise ValueError(f'{code}: неполная карта ветви {role}')
+        expected = ('MTEXT', 'LWPOLYLINE', 'LINE', 'HATCH', 'CIRCLE')
+        entities = [modelspace.doc.entitydb.get(handle) for handle in handles]
+        if any(entity is None or entity.dxftype() != kind or entity not in modelspace
+               for entity, kind in zip(entities, expected)):
+            raise ValueError(f'{code}: изменилась геометрия ветви {role}')
+        for entity in entities:
+            modelspace.delete_entity(entity)
+        field['status'] = 'suppressedModuleCommon' if module_ref else 'shared-common'
+        field['after'] = '' if module_ref else field['after']
+        field['removedEntityHandles'] = handles
+        if not module_ref:
+            field['sharedWith'] = visible_commons[key]
+        removed += 1
+    return removed
 
 
 def parse_args() -> argparse.Namespace:
@@ -317,6 +390,22 @@ def load_and_validate(selected: list[tuple[str, Path]], profile=None):
             details = "; ".join(error.message for error in audit.errors)
             raise ValueError(f"DXF-блок {code} не проходит аудит: {details}")
         modelspace = document.modelspace()
+        source_sha256 = hashlib.sha256(path.read_bytes()).hexdigest()
+        contract_path = TEMPLATE_CONTRACTS / f'{code}.json'
+        if contract_path.is_file():
+            contract = json.loads(contract_path.read_text(encoding='utf-8'))
+            if contract.get('sourceSha256') != source_sha256:
+                raise ValueError(f'Изменилась версия DXF {code}; требуется повторная проверка полей')
+            nonhatch = bbox.extents((entity for entity in modelspace if entity.dxftype() != 'HATCH'), fast=True)
+            for handle in contract.get('detachedHatches', []):
+                entity = document.entitydb.get(handle)
+                if entity is None or entity.dxftype() != 'HATCH':
+                    raise ValueError(f'{code}: не найден проверенный удалённый штриховой объект {handle}')
+                box = bbox.extents([entity], fast=True)
+                if not box.has_data or not (box.extmax.x < nonhatch.extmin.x - 5 or box.extmin.x > nonhatch.extmax.x + 5
+                                            or box.extmax.y < nonhatch.extmin.y - 5 or box.extmin.y > nonhatch.extmax.y + 5):
+                    raise ValueError(f'{code}: штриховой объект {handle} больше не отделён от схемы')
+                modelspace.delete_entity(entity)
         extents = bbox.extents(modelspace, fast=True)
         if not extents.has_data:
             raise ValueError(f"DXF-блок {code} не содержит геометрии")
@@ -332,7 +421,7 @@ def load_and_validate(selected: list[tuple[str, Path]], profile=None):
             elif (extents.extmin.y - profile['sourceOriginY'] + profile['verticalOffset'] < profile['bottom']
                   or extents.extmax.y - profile['sourceOriginY'] + profile['verticalOffset'] > profile['top']):
                 raise ValueError(f'Неверная вертикальная привязка {code}: нужен контракт координат шаблона')
-        prepared.append((code, document, modelspace, extents, hashlib.sha256(path.read_bytes()).hexdigest()))
+        prepared.append((code, document, modelspace, extents, source_sha256))
     return prepared
 
 
@@ -428,7 +517,6 @@ def assemble(pages, output: Path, instances=None, profile=None, parameter_trace=
     target_msp = target.modelspace()
     occurrence = 0
     designation_counters = {}
-    seen_commons = set()
     field_contract = load_field_contract()
     module_sheets = module_sheets or []
     if module_sheets and (not profile or drawing_kind != 'electrical'):
@@ -446,36 +534,18 @@ def assemble(pages, output: Path, instances=None, profile=None, parameter_trace=
         if profile and page and all(template_placement(code, source_msp) for code, _, source_msp, _, _ in page):
             packed_width = sum(item[3].size.x for item in page) + profile['gap'] * (len(page) - 1)
             cursor_x += ((profile['right'] - profile['left']) - packed_width) / 2
+        visible_commons = {}
+        first_on_page = True
         for code, source_doc, source_msp, extents, source_sha256 in page:
             occurrence += 1
             instance = instances[occurrence - 1] if instances else {"tag": "", "id": str(occurrence)}
             placement = template_placement(code, source_msp) if profile else None
             if (TEMPLATE_CONTRACTS / f'{code}.json').is_file():
                 applied_fields = apply_template_contract(code, source_msp, source_sha256, instance, designation_counters)
-                for field in applied_fields:
-                    if field['fieldId'] not in ('plc.inputCommon', 'plc.outputCommon'):
-                        continue
-                    if field['assignedModule']:
-                        source_msp.delete_entity(source_doc.entitydb[field['placeholderHandle']])
-                        field['after'] = ''
-                        field['status'] = 'suppressedModuleCommon'
-                        continue
-                    if field['status'] != 'applied':
-                        continue
-                    common = field['after']
-                    matching = [channel for channel in instance.get('channels', [])
-                                if channel.get('commonDesignation') == common and channel.get('deviceRef', 'PLC') == 'PLC']
-                    if not matching:
-                        continue
-                    key = ('PLC', common)
-                    if key in seen_commons:
-                        source_msp.delete_entity(source_doc.entitydb[field['placeholderHandle']])
-                        field['after'] = ''
-                        field['status'] = 'suppressedSharedCommon'
-                    else:
-                        seen_commons.add(key)
+                shared_count = merge_repeated_commons(code, source_msp, applied_fields, visible_commons, instance['id'])
             else:
                 applied_fields = renumber_designations(source_msp, designation_counters, field_contract)
+                shared_count = 0
             if parameter_trace is not None:
                 for field in applied_fields:
                     parameter_trace.append({
@@ -484,19 +554,25 @@ def assemble(pages, output: Path, instances=None, profile=None, parameter_trace=
                         'instanceId': instance['id'],
                         'sourceCode': code,
                     })
+            current_extents = bbox.extents(source_msp, fast=True)
+            if not current_extents.has_data:
+                raise ValueError(f'{code}: после объединения общих выводов нет геометрии')
+            if shared_count and profile and not first_on_page:
+                cursor_x -= max(profile['gap'] - 2.0, 0)
             if placement:
-                dx = cursor_x - extents.extmin.x
+                dx = cursor_x - current_extents.extmin.x
                 dy = placement['y'] - placement['anchor'].y
             else:
-                dx = cursor_x - extents.extmin.x
-                dy = -profile['sourceOriginY'] + profile['verticalOffset'] if profile else TOP - extents.extmax.y
+                dx = cursor_x - current_extents.extmin.x
+                dy = -profile['sourceOriginY'] + profile['verticalOffset'] if profile else TOP - current_extents.extmax.y
             log = transform.inplace(source_msp, Matrix44.translate(dx, dy, 0))
             if len(log):
                 raise ValueError(f"Не все сущности {code} удалось переместить: {list(log)}")
             xref.load_modelspace(source_doc, target, conflict_policy=xref.ConflictPolicy.XREF_PREFIX)
             # An occurrence label is NOT electrical device/terminal renumbering.
             target_msp.add_text(f"DRAFT {occurrence}: {instance['tag']} / {code}", dxfattribs={"insert": (cursor_x, 278 if profile else TOP + 5), "height": 2.0})
-            cursor_x += extents.size.x + (profile['gap'] if profile else 0)
+            cursor_x += current_extents.size.x + (profile['gap'] if profile else 0)
+            first_on_page = False
     extents = bbox.extents(target_msp, fast=False)
     if extents.has_data:
         # Keep the header's WCS extents consistent with the assembled model.

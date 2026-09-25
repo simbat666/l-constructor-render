@@ -56,186 +56,74 @@
     {
       "code": "im1-011",
       "sourceSha256": "b42cc2997098a437e469a43ad787d2df0010286579b2ea62514b28186d14f130",
-      "outputSource": "AutoCAD Core Console DXF; removed 23 detached legacy HATCH entities outside current fragment",
       "output": {
         "dxfVersion": "AC1032",
-        "bytes": 180093,
-        "sha256": "7f59703013b6c102288b2afff03bbc950696b6648cc11dad11b679b42b55cabf",
-        "entityCount": 91,
+        "bytes": 273136,
+        "sha256": "a11d81a25087449a1868dfdabcb781f8278dfff5b8ade9318916369b1da80bd6",
+        "entityCount": 114,
         "auditErrors": 0,
         "extents": [
-          4543.366,
+          4483.148,
           5955.567,
           4632.44,
           6167.871
         ]
       },
-      "preparation": {
-        "convertedSha256": "16985f6a92908fc6266897ca8c845a11952197dc897ee370273edb4447d3275d",
-        "removedOrphanHatchHandles": [
-          "12F5",
-          "12F7",
-          "12FB",
-          "12FD",
-          "12FF",
-          "1301",
-          "1303",
-          "1305",
-          "1307",
-          "1309",
-          "130B",
-          "130D",
-          "130F",
-          "1311",
-          "1313",
-          "1315",
-          "1317",
-          "1319",
-          "1321",
-          "132D",
-          "1331",
-          "1334",
-          "1337"
-        ]
-      }
+      "outputSource": "AutoCAD Core Console DXF; detached legacy HATCH removed from working copy during assembly"
     },
     {
       "code": "im1-012",
       "sourceSha256": "dab628ddd4851197b2c4bde0d192e452ef727820f5f045781db547bd6bb87573",
       "output": {
         "dxfVersion": "AC1032",
-        "bytes": 180457,
-        "sha256": "792b85dbc6b151538950911f27853e61421f54fd7a93335d5ea9dbaec5f1f2df",
-        "entityCount": 93,
+        "bytes": 273554,
+        "sha256": "b9f5dfbd8bb249786b318baa474fa5474317e327a367184557253d194ed787f9",
+        "entityCount": 116,
         "auditErrors": 0,
         "extents": [
-          4689.841,
+          4483.148,
           5942.676,
           4778.915,
           6154.98
         ]
       },
-      "outputSource": "AutoCAD Core Console DXF; removed 23 detached legacy HATCH entities outside current fragment",
-      "preparation": {
-        "convertedSha256": "b9f5dfbd8bb249786b318baa474fa5474317e327a367184557253d194ed787f9",
-        "removedOrphanHatchHandles": [
-          "12F5",
-          "12F7",
-          "12FB",
-          "12FD",
-          "12FF",
-          "1301",
-          "1303",
-          "1305",
-          "1307",
-          "1309",
-          "130B",
-          "130D",
-          "130F",
-          "1311",
-          "1313",
-          "1315",
-          "1317",
-          "1319",
-          "1321",
-          "132D",
-          "1331",
-          "1334",
-          "1337"
-        ]
-      }
+      "outputSource": "AutoCAD Core Console DXF; detached legacy HATCH removed from working copy during assembly"
     },
     {
       "code": "im1-013",
       "sourceSha256": "09cae92daf5fa9538af151d8087cb0ff974328a30280aea13b005ac61f8cf85e",
       "output": {
         "dxfVersion": "AC1032",
-        "bytes": 180044,
-        "sha256": "6d5c7dd363c985c03e37f074c519721600afecdd89a85cc30b9b79eaaf2d1e97",
-        "entityCount": 91,
+        "bytes": 273087,
+        "sha256": "f7655f85369c8f751bd096d4a90667e600e0b335430ac9f74768cbfaab8edac0",
+        "entityCount": 114,
         "auditErrors": 0,
         "extents": [
-          4743.75,
+          4483.148,
           5953.331,
           4826.476,
           6165.635
         ]
       },
-      "outputSource": "AutoCAD Core Console DXF; removed 23 detached legacy HATCH entities outside current fragment",
-      "preparation": {
-        "convertedSha256": "f7655f85369c8f751bd096d4a90667e600e0b335430ac9f74768cbfaab8edac0",
-        "removedOrphanHatchHandles": [
-          "12F5",
-          "12F7",
-          "12FB",
-          "12FD",
-          "12FF",
-          "1301",
-          "1303",
-          "1305",
-          "1307",
-          "1309",
-          "130B",
-          "130D",
-          "130F",
-          "1311",
-          "1313",
-          "1315",
-          "1317",
-          "1319",
-          "1321",
-          "132D",
-          "1331",
-          "1334",
-          "1337"
-        ]
-      }
+      "outputSource": "AutoCAD Core Console DXF; detached legacy HATCH removed from working copy during assembly"
     },
     {
       "code": "im1-014",
       "sourceSha256": "ad313137e27aaa1d7718474f99d6622777949200740f89071c163506066bf28c",
       "output": {
         "dxfVersion": "AC1032",
-        "bytes": 187026,
-        "sha256": "f9eeb13af9c9948299e197aa5a350fa45588e8ba9d33e79b316b294f6479fdde",
-        "entityCount": 93,
+        "bytes": 281779,
+        "sha256": "aff68c12d586345825a16333af8f7935add4f627fdeb570beaa800e666aa8f8a",
+        "entityCount": 116,
         "auditErrors": 0,
         "extents": [
-          4820.926,
+          4483.148,
           5956.011,
           4914.986,
           6168.315
         ]
       },
-      "outputSource": "AutoCAD Core Console DXF; removed 23 detached legacy HATCH entities outside current fragment",
-      "preparation": {
-        "convertedSha256": "aff68c12d586345825a16333af8f7935add4f627fdeb570beaa800e666aa8f8a",
-        "removedOrphanHatchHandles": [
-          "12F5",
-          "12F7",
-          "12FB",
-          "12FD",
-          "12FF",
-          "1301",
-          "1303",
-          "1305",
-          "1307",
-          "1309",
-          "130B",
-          "130D",
-          "130F",
-          "1311",
-          "1313",
-          "1315",
-          "1317",
-          "1319",
-          "1321",
-          "132D",
-          "1331",
-          "1334",
-          "1337"
-        ]
-      }
+      "outputSource": "AutoCAD Core Console DXF; detached legacy HATCH removed from working copy during assembly"
     },
     {
       "code": "im1-021",

@@ -99,13 +99,13 @@ class FrozenEngineFixturesTests(unittest.TestCase):
 
     def test_cad_names_follow_active_ol_answers(self):
         self.assertEqual([(row['keyDiagram'], row['sourceRow']) for row in BASE['diagramHeads']],
-                         [('Imd-3', 2), ('Imd-1', 3), ('Imd-2', 4)])
+                         [(key, start + offset) for start in (2, 5, 8, 11)
+                          for offset, key in enumerate(('Imd-3', 'Imd-1', 'Imd-2'))])
         case = next(case for case in FIXTURES['cases'] if case['id'] == 'direct-motor')
         result = calculate_cabinet(copy.deepcopy(case['motors']))
         self.assertTrue(result['instances'])
-        # The source OL has no diagram-head row for im1-014. Its supplied DWG
-        # carries the same keys, so values trace directly to active Ques 1 rows.
-        self.assertEqual(result['instances'][0]['cadHeadRules'], [])
+        self.assertEqual({rule['keyDiagram'] for rule in result['instances'][0]['cadHeadRules']},
+                         {'Imd-3', 'Imd-1', 'Imd-2'})
         self.assertEqual(result['instances'][0]['cadFieldValues']['marking'], 'M1')
         self.assertTrue(result['instances'][0]['cadFieldSources']['marking'].startswith('Ques 1:'))
 

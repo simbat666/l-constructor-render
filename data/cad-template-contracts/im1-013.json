@@ -1,9 +1,35 @@
 {
-  "schemaVersion": 1,
-  "sourceSha256": "6d5c7dd363c985c03e37f074c519721600afecdd89a85cc30b9b79eaaf2d1e97",
-  "inputFamily": "DI24-NPN",
-  "outputFamily": "DOT-PNP",
-  "requireDiagramHead": false,
+  "schemaVersion": 2,
+  "sourceSha256": "f7655f85369c8f751bd096d4a90667e600e0b335430ac9f74768cbfaab8edac0",
+  "signals": {
+    "di": "DI24-NPN",
+    "do": "DOT-PNP"
+  },
+  "detachedHatches": [
+    "12F5",
+    "12F7",
+    "12FB",
+    "12FD",
+    "12FF",
+    "1301",
+    "1303",
+    "1305",
+    "1307",
+    "1309",
+    "130B",
+    "130D",
+    "130F",
+    "1311",
+    "1313",
+    "1315",
+    "1317",
+    "1319",
+    "1321",
+    "132D",
+    "1331",
+    "1334",
+    "1337"
+  ],
   "fields": [
     {
       "handle": "15B6",
@@ -18,35 +44,10 @@
       "role": "terminal.xt1.2"
     },
     {
-      "handle": "15BC",
-      "layer": "Headers",
-      "text": "#Process Device Type",
-      "role": "header.processDeviceType",
-      "diagramKey": "Imd-3"
-    },
-    {
-      "handle": "15D8",
-      "layer": "Слой1",
-      "text": "#KM1.1",
-      "role": "device.km.contact"
-    },
-    {
       "handle": "15D9",
       "layer": "Слой1",
       "text": "#QF1",
       "role": "device.qf.main"
-    },
-    {
-      "handle": "15DB",
-      "layer": "XT1",
-      "text": "#GND1",
-      "role": "plc.inputCommon"
-    },
-    {
-      "handle": "15F2",
-      "layer": "Слой1",
-      "text": "#KM1",
-      "role": "device.km.main"
     },
     {
       "handle": "15F8",
@@ -55,24 +56,52 @@
       "role": "device.qf.contact"
     },
     {
-      "handle": "15FA",
-      "layer": "XT1",
-      "text": "#DI24-NPN",
-      "role": "plc.di"
+      "handle": "15F2",
+      "layer": "Слой1",
+      "text": "#KM1",
+      "role": "device.km.main"
+    },
+    {
+      "handle": "15D8",
+      "layer": "Слой1",
+      "text": "#KM1.1",
+      "role": "device.km.contact"
+    },
+    {
+      "handle": "15BC",
+      "layer": "Headers",
+      "text": "#Process Device Type",
+      "role": "header.processDeviceType",
+      "diagramKey": "Imd-3",
+      "offsetY": -4.0
     },
     {
       "handle": "15FD",
       "layer": "Headers",
       "text": "#Marking",
       "role": "header.marking",
-      "diagramKey": "Imd-1"
+      "diagramKey": "Imd-1",
+      "offsetY": -4.0
     },
     {
       "handle": "15FE",
       "layer": "Headers",
       "text": "#Device tag",
       "role": "header.deviceTag",
-      "diagramKey": "Imd-2"
+      "diagramKey": "Imd-2",
+      "offsetY": -4.0
+    },
+    {
+      "handle": "15DB",
+      "layer": "XT1",
+      "text": "#GND1",
+      "role": "plc.common"
+    },
+    {
+      "handle": "15FA",
+      "layer": "XT1",
+      "text": "#DI24-NPN",
+      "role": "plc.di"
     },
     {
       "handle": "1604",
@@ -84,14 +113,30 @@
       "handle": "1606",
       "layer": "XT1",
       "text": "#GND3",
-      "role": "plc.outputCommon"
+      "role": "plc.do.common"
     }
   ],
-  "headerSource": "questionnaire",
+  "commonBranches": {
+    "plc.common": [
+      "15DB",
+      "15DA",
+      "15F3",
+      "15FF",
+      "1600"
+    ],
+    "plc.do.common": [
+      "1606",
+      "1605",
+      "1608",
+      "1609",
+      "160A"
+    ]
+  },
   "placement": {
     "anchorHandle": "15B8",
     "anchorText": "ХТ1",
     "x": 146.83,
     "y": 72.52
-  }
+  },
+  "requireDiagramHead": true
 }

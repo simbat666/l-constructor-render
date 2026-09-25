@@ -7,7 +7,7 @@
     },
     "marking": {
       "file": "Правило_обозначения и маркировки элемкнтов на схеме_Э3_В2.xlsx",
-      "sha256": "6ee1767df875fbc427c1abc6e7461959c02cd3767a3a343bf053a551cbc1a8e1"
+      "sha256": "f6c4b480baf01cd40ab7d4ca02e5e4c235cfd41dfbc94285e4b504007f536cd4"
     }
   },
   "controller": {
@@ -1506,5 +1506,143 @@
       "commonKey": null,
       "commonDesignation": null
     }
-  ]
+  ],
+  "templateFields": {
+    "im1-011": [
+      {
+        "sourceSheet": "Поля схем Э3",
+        "sourceRow": 2,
+        "role": "plc.di",
+        "marker": "#DI24-NPN",
+        "signal": "DI24-NPN",
+        "valueFrom": "entrance number 1"
+      },
+      {
+        "sourceSheet": "Поля схем Э3",
+        "sourceRow": 3,
+        "role": "plc.common",
+        "marker": "#GND1",
+        "signal": "DI24-NPN",
+        "valueFrom": "CND_COM"
+      },
+      {
+        "sourceSheet": "Поля схем Э3",
+        "sourceRow": 4,
+        "role": "plc.do.1",
+        "marker": "#DOR-NO",
+        "signal": "DOR-NO",
+        "valueFrom": "entrance number 1"
+      },
+      {
+        "sourceSheet": "Поля схем Э3",
+        "sourceRow": 5,
+        "role": "plc.do.2",
+        "marker": "#DOR-NO",
+        "signal": "DOR-NO",
+        "valueFrom": "entrance number 2"
+      }
+    ],
+    "im1-012": [
+      {
+        "sourceSheet": "Поля схем Э3",
+        "sourceRow": 6,
+        "role": "plc.di",
+        "marker": "#DI24-PNP",
+        "signal": "DI24-PNP",
+        "valueFrom": "entrance number 1"
+      },
+      {
+        "sourceSheet": "Поля схем Э3",
+        "sourceRow": 7,
+        "role": "plc.common",
+        "marker": "#GND1",
+        "signal": "DI24-PNP",
+        "valueFrom": "CND_COM"
+      },
+      {
+        "sourceSheet": "Поля схем Э3",
+        "sourceRow": 8,
+        "role": "plc.do.1",
+        "marker": "#DOR-NO",
+        "signal": "DOR-NO",
+        "valueFrom": "entrance number 1"
+      },
+      {
+        "sourceSheet": "Поля схем Э3",
+        "sourceRow": 9,
+        "role": "plc.do.2",
+        "marker": "#DOR-NO",
+        "signal": "DOR-NO",
+        "valueFrom": "entrance number 2"
+      }
+    ],
+    "im1-013": [
+      {
+        "sourceSheet": "Поля схем Э3",
+        "sourceRow": 10,
+        "role": "plc.di",
+        "marker": "#DI24-NPN",
+        "signal": "DI24-NPN",
+        "valueFrom": "entrance number 1"
+      },
+      {
+        "sourceSheet": "Поля схем Э3",
+        "sourceRow": 11,
+        "role": "plc.common",
+        "marker": "#GND1",
+        "signal": "DI24-NPN",
+        "valueFrom": "CND_COM"
+      },
+      {
+        "sourceSheet": "Поля схем Э3",
+        "sourceRow": 12,
+        "role": "plc.do.1",
+        "marker": "#DOT-PNP",
+        "signal": "DOT-PNP",
+        "valueFrom": "entrance number 1"
+      },
+      {
+        "sourceSheet": "Поля схем Э3",
+        "sourceRow": 13,
+        "role": "plc.do.common",
+        "marker": "#GND3",
+        "signal": "DOT-PNP",
+        "valueFrom": "CND_COM"
+      }
+    ],
+    "im1-014": [
+      {
+        "sourceSheet": "Поля схем Э3",
+        "sourceRow": 14,
+        "role": "plc.di",
+        "marker": "#DI24-PNP",
+        "signal": "DI24-PNP",
+        "valueFrom": "entrance number 1"
+      },
+      {
+        "sourceSheet": "Поля схем Э3",
+        "sourceRow": 15,
+        "role": "plc.common",
+        "marker": "#GND1",
+        "signal": "DI24-PNP",
+        "valueFrom": "CND_COM"
+      },
+      {
+        "sourceSheet": "Поля схем Э3",
+        "sourceRow": 16,
+        "role": "plc.do.1",
+        "marker": "#DOT-PNP",
+        "signal": "DOT-PNP",
+        "valueFrom": "entrance number 1"
+      },
+      {
+        "sourceSheet": "Поля схем Э3",
+        "sourceRow": 17,
+        "role": "plc.do.common",
+        "marker": "#GND3",
+        "signal": "DOT-PNP",
+        "valueFrom": "CND_COM"
+      }
+    ]
+  }
 }
