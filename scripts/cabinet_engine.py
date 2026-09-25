@@ -1,6 +1,7 @@
 """Authoritative cabinet calculation; shared by calculation and CAD endpoints."""
 import math
 import hashlib
+import re
 from questionnaire import (BASE, BINDINGS, active_answers, diagram_rows, optional_rows,
                            selections, semantic_key, norm, number, fmt, prune_state, visible_groups)
 from io_allocator import CATALOG, allocate_io
@@ -40,6 +41,14 @@ def calculate_cabinet(motors):
     for motor in motors:
         selection = diagram_rows(motor['state'])
         errors = list(selection['missing'])
+        main_choices = [dict(code=row['diagram1'], io=row['io'], sourceRow=row['sourceRow'])
+                        for row in selection['rows'] if row.get('diagram1')]
+        preferred = motor.get('mainSchemeCode')
+        if preferred:
+            selected = [row for row in selection['rows'] if row.get('diagram1') == preferred]
+            if selection['rows'] and not selected:
+                errors.append(f'Схема {preferred} не подходит к текущим ответам. Выбери другой вариант или автоматический подбор.')
+            selection['rows'] = selected
         fields = semantic_fields(motor['state'])
         if not selection['rows'] and not errors:
             errors.append('В diagram 1 нет подходящей строки.')
@@ -65,7 +74,7 @@ def calculate_cabinet(motors):
                 demands.append(dict(id=f"{motor['id']}:{dimension}:{index + 1}", blockId=motor['id'], source='diagram 2', candidates=candidates))
         if any(a['fieldType'] == 'uploadButton' for a in active_answers(motor['state'])):
             errors.append('Пользовательское УГО: сохранено только имя файла. Импорт геометрии ещё не реализован.')
-        blocks.append(dict(motor, errors=errors, warnings=[], fields=fields, optional=[], channels=[], loadIndex=None, loadRule=None, specification=[]))
+        blocks.append(dict(motor, errors=errors, warnings=[], fields=fields, mainChoices=main_choices, optional=[], channels=[], loadIndex=None, loadRule=None, specification=[]))
     by_id = {b['id']: b for b in blocks}
     ready = [d for d in demands if not by_id[d['blockId']]['errors']]
     controller_sets = [{(norm(r.get('controller')), norm(r.get('controllerType'))) for r in d['candidates']
@@ -102,17 +111,22 @@ def calculate_cabinet(motors):
             'marking': head_answers.get('Imd-1'),
             'deviceTag': head_answers.get('Imd-2'),
         }
+        cad_field_sources = {
+            {'Imd-3': 'processDeviceType', 'Imd-1': 'marking', 'Imd-2': 'deviceTag'}[answer['diagramKey']]:
+                f"{answer['sheet']}:{answer['sourceRow']}"
+            for answer in active_answers(block['state']) if answer.get('diagramKey') in ('Imd-3', 'Imd-1', 'Imd-2')
+        }
         for index, key in enumerate(('diagram1', 'diagram2')):
             code = allocation['scheme'].get(key)
             if code and code.strip():
                 head_rules = [dict(rule, value=cad_fields[{'Imd-3': 'processDeviceType', 'Imd-1': 'marking', 'Imd-2': 'deviceTag'}[rule['keyDiagram']]])
                               for rule in BASE.get('diagramHeads', []) if rule['code'] == code.strip()]
-                instances.append(dict(drawingKind='electrical' if index == 0 else 'external', id=f"{demand['id']}:{index + 1}", blockId=block['id'], tag=block['tag'], code=code.strip(), source=f"{demand['source']}:{allocation['scheme']['sourceRow']}", channels=allocation['channels'], cadHeadRules=head_rules))
+                instances.append(dict(drawingKind='electrical' if index == 0 else 'external', id=f"{demand['id']}:{index + 1}", blockId=block['id'], tag=block['tag'], code=code.strip(), source=f"{demand['source']}:{allocation['scheme']['sourceRow']}", channels=allocation['channels'], cadHeadRules=head_rules, cadFieldValues=cad_fields, cadFieldSources=cad_field_sources))
     for instance in instances:
-        if instance['code'] == 'im1-011' and instance['drawingKind'] == 'electrical' and any(
-                channel['deviceRef'] != 'PLC' and channel['family'] in ('DI24-NPN', 'DOR-NO')
+        if instance['code'] in ('im1-011', 'im1-012', 'im1-013', 'im1-014') and instance['drawingKind'] == 'electrical' and any(
+                channel['deviceRef'] != 'PLC' and channel['family'] in ('DI24-NPN', 'DI24-PNP', 'DOR-NO', 'DOT-PNP')
                 for channel in instance['channels']):
-            errors.append(f"{instance['tag']}: im1-011: для вывода модуля нет проверенного поля обозначения устройства на схеме.")
+            errors.append(f"{instance['tag']}: {instance['code']}: для вывода модуля нет проверенного поля обозначения устройства на схеме.")
     for block in blocks:
         if not block.get('main'):
             continue
@@ -186,8 +200,8 @@ def calculate_cabinet(motors):
         block['decisionTrace'] = dict(inputs=inputs, rules=rules, outputs=outputs)
     modules = plan['modules'] if plan else []
     return dict(schemaVersion=1, ruleFingerprint=RULE_FINGERPRINT, status='draft', blocks=blocks, instances=instances, errors=errors, warnings=[
-        'DXF — черновая компоновка шаблонов, не выпущенная КД. QF/KM/KL нумеруются, но выводы ПЛК, XT, GND/COM, номиналы и соединения ещё не параметризованы.',
-        'Выводы ПЛК и тестовых модулей распределены по таблице ключей. Клеммы шкафа XT и подключение GND/COM на CAD ещё не рассчитаны.',
+        'DXF — черновая компоновка шаблонов, не выпущенная КД. Для im1-011…014 маркируются выводы ПЛК, ХТ1, QF/KM и заголовки; номиналы и электрические соединения ещё не параметризованы.',
+        'Выводы ПЛК и тестовых модулей распределены по таблице ключей. Физическое объединение GND/COM и связи с внешней схемой ещё не рассчитаны.',
         *(['Номера клемм M245 no display в тестовом листе составлены по образцу M245; нужна сверка с паспортом модуля.'] if modules else []),
     ], controllerFamily=plan['controller'] if plan else None,
        modules=modules,
@@ -220,6 +234,10 @@ def validate_project(payload):
             raise ValueError('Некорректная маркировка блока')
         if not isinstance(state, dict):
             raise ValueError('Нужны ответы блока')
+        main_scheme_code = motor.get('mainSchemeCode')
+        if main_scheme_code is not None and (not isinstance(main_scheme_code, str) or
+                                             not re.fullmatch(r'[A-Za-z0-9_-]{1,80}', main_scheme_code)):
+            raise ValueError('Некорректный код выбранной схемы')
         clean = {}
         for part in ('selected', 'inputs', 'checks', 'uploads'):
             values = state.get(part)
@@ -229,7 +247,8 @@ def validate_project(payload):
                 raise ValueError('Некорректный тип или длина ответа')
             clean[part] = dict(values)
         seen.add(identity)
-        result.append(dict(id=identity, tag=tag, state=prune_state(clean)))
+        result.append(dict(id=identity, tag=tag, state=prune_state(clean),
+                           **({'mainSchemeCode': main_scheme_code} if main_scheme_code else {})))
     return result
 
 def evaluate_project(payload):

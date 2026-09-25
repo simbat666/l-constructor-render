@@ -159,21 +159,27 @@ def apply_template_contract(code, modelspace, source_sha256, instance, counters)
             raise ValueError(f'Поле {code}:{field["handle"]} не совпало с проверенным шаблоном')
         entities[field['handle']] = entity
 
+    input_family = contract.get('inputFamily')
+    output_family = contract.get('outputFamily')
+    if input_family not in ('DI24-NPN', 'DI24-PNP') or output_family not in ('DOR-NO', 'DOT-PNP'):
+        raise ValueError(f'{code}: не задан проверенный тип входа и выхода')
     channels = instance.get('channels', [])
-    di = [item for item in channels if item.get('family') == 'DI24-NPN']
-    do = [item for item in channels if item.get('family') == 'DOR-NO']
-    if len(di) != 1 or len(do) != 1 or len(do[0].get('terminals', [])) != 2:
-        raise ValueError(f'{code}: требуется ровно один DI24-NPN и один DOR-NO с двумя выводами')
+    di = [item for item in channels if item.get('family') == input_family]
+    do = [item for item in channels if item.get('family') == output_family]
+    expected_output_terminals = 2 if output_family == 'DOR-NO' else 1
+    if len(di) != 1 or len(do) != 1 or len(do[0].get('terminals', [])) != expected_output_terminals:
+        raise ValueError(f'{code}: требуется один {input_family} и один {output_family}')
     if di[0].get('deviceRef', 'PLC') != 'PLC' or do[0].get('deviceRef', 'PLC') != 'PLC':
         raise ValueError(f'{code}: нет проверенной маркировки вывода модуля на CAD-шаблоне')
-    if (di[0].get('commonKey') != '#GND1' or di[0].get('commonDesignation') != 'GND1'
-            or not di[0].get('address')):
-        raise ValueError(f'{code}: не подтверждена группа GND1 и клемма DI24-NPN')
+    if not di[0].get('commonDesignation') or not di[0].get('address'):
+        raise ValueError(f'{code}: не подтверждены общий вывод и клемма {input_family}')
+    if output_family == 'DOT-PNP' and not do[0].get('commonDesignation'):
+        raise ValueError(f'{code}: не подтверждён общий вывод {output_family}')
     head_rules = instance.get('cadHeadRules')
-    if not isinstance(head_rules, list) or len(head_rules) != 3:
+    if not isinstance(head_rules, list) or (contract.get('requireDiagramHead') and len(head_rules) != 3):
         raise ValueError(f'{code}: нет трёх правил diagram head из ОЛ')
     head_by_key = {rule.get('keyDiagram'): rule for rule in head_rules}
-    if len(head_by_key) != 3:
+    if len(head_by_key) != len(head_rules):
         raise ValueError(f'{code}: повтор ключа diagram head')
 
     # The source has one QF and one KM. Contacts share their device numbers.
@@ -189,17 +195,31 @@ def apply_template_contract(code, modelspace, source_sha256, instance, counters)
         'device.qf.contact': f"QF{numbers['QF']}.1",
         'device.km.main': f"KM{numbers['KM']}",
         'device.km.contact': f"KM{numbers['KM']}.1",
-        'plc.common': di[0]['commonDesignation'],
+        'plc.inputCommon': di[0]['commonDesignation'],
         'plc.di': str(di[0]['address']),
         'plc.do.1': str(do[0]['terminals'][0]),
-        'plc.do.2': str(do[0]['terminals'][1]),
     }
+    if output_family == 'DOR-NO':
+        values['plc.do.2'] = str(do[0]['terminals'][1])
+    else:
+        values['plc.outputCommon'] = do[0]['commonDesignation']
     for field in fields:
         key = field.get('diagramKey')
         if not key:
             continue
         rule = head_by_key.get(key)
-        if not rule or rule.get('code') != code or rule.get('placeholder') != field.get('sourcePlaceholder', field['text']):
+        if not rule:
+            if contract.get('requireDiagramHead'):
+                raise ValueError(f'{code}: ключ {key} отсутствует в diagram head ОЛ')
+            if contract.get('headerSource') == 'questionnaire':
+                header_name = {'Imd-3': 'processDeviceType', 'Imd-1': 'marking', 'Imd-2': 'deviceTag'}[key]
+                value = (instance.get('cadFieldValues') or {}).get(header_name)
+                if value is not None:
+                    if not isinstance(value, str) or not value.strip() or len(value) > 100 or any(ord(c) < 32 for c in value):
+                        raise ValueError(f'{code}: некорректное значение {key} из опросника')
+                    values[field['role']] = value.strip()
+            continue
+        if rule.get('code') != code or rule.get('placeholder') != field.get('sourcePlaceholder', field['text']):
             raise ValueError(f'{code}: ключ {key} в diagram head не соответствует проверенному полю DXF')
         value = rule.get('value')
         if value is not None:
@@ -225,7 +245,11 @@ def apply_template_contract(code, modelspace, source_sha256, instance, counters)
             'placeholderHandle': field['handle'],
             'offsetY': field.get('offsetY', 0),
             'status': 'unresolved' if unresolved else 'applied',
-            'ruleSource': f"diagram head:{head_by_key[field['diagramKey']]['sourceRow']}" if field.get('diagramKey') else None,
+            'ruleSource': (f"diagram head:{head_by_key[field['diagramKey']]['sourceRow']}"
+                           if field.get('diagramKey') in head_by_key else
+                           (instance.get('cadFieldSources') or {}).get(
+                               {'Imd-3': 'processDeviceType', 'Imd-1': 'marking', 'Imd-2': 'deviceTag'}[field['diagramKey']])
+                           if field.get('diagramKey') and contract.get('headerSource') == 'questionnaire' else None),
         })
     return trace
 

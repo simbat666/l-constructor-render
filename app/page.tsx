@@ -88,6 +88,7 @@ type MotorBlock = {
   tag: string;
   cell: number;
   state: QuestionnaireState;
+  mainSchemeCode?: string;
   requested: boolean;
   generation: Generation;
 };
@@ -258,11 +259,11 @@ function CabinetApp({ user, project, workspace, onBack, onLogout }: { user: stri
   });
   const {cabinet, revision: questionnaireRevision} = engineering;
   const inputVersion = JSON.stringify(
-    motors.map(({ id, tag, state }) => ({ id, tag, state })),
+    motors.map(({ id, tag, state, mainSchemeCode }) => ({ id, tag, state, ...(mainSchemeCode ? { mainSchemeCode } : {}) })),
   );
   useEffect(() => {
     saveLocalWorkspace(user, project.id, workspace.id, {
-      motors: motors.map(({ id, tag, cell, state }) => ({ id, tag, cell, state })),
+      motors: motors.map(({ id, tag, cell, state, mainSchemeCode }) => ({ id, tag, cell, state, ...(mainSchemeCode ? { mainSchemeCode } : {}) })),
       activeMotorId,
       sheetOpen,
     });
@@ -722,6 +723,10 @@ function CabinetApp({ user, project, workspace, onBack, onLogout }: { user: stri
           }
           diagramRows={calculatedMotor?.main ? [calculatedMotor.main] : []}
           selectedMain={calculatedMotor?.main}
+          mainChoices={calculatedMotor?.mainChoices || []}
+          mainSchemeCode={activeMotor.mainSchemeCode || ''}
+          onMainSchemeChange={(code) => setMotors(current => current.map(motor => motor.id === activeMotor.id
+            ? { ...motor, mainSchemeCode: code || undefined, generation: { status: 'idle' } } : motor))}
           channels={calculatedMotor?.channels || []}
           optionalRows={optionalDiagram}
           missing={calculatedMotor?.errors || []}
@@ -745,6 +750,7 @@ function CabinetApp({ user, project, workspace, onBack, onLogout }: { user: stri
                   ? {
                       ...motor,
                       state: initialQuestionnaireState,
+                      mainSchemeCode: undefined,
                       requested: false,
                       generation: { status: 'idle' },
                     }
@@ -944,6 +950,9 @@ function QuestionnaireSheet({
   setRequested,
   diagramRows,
   selectedMain,
+  mainChoices,
+  mainSchemeCode,
+  onMainSchemeChange,
   channels,
   optionalRows,
   missing,
@@ -971,6 +980,9 @@ function QuestionnaireSheet({
   setRequested: (value: boolean) => void;
   diagramRows: DiagramRow[];
   selectedMain?: DiagramRow;
+  mainChoices: Array<{code: string; io: Record<string, number>; sourceRow: number}>;
+  mainSchemeCode: string;
+  onMainSchemeChange: (code: string) => void;
   channels: Channel[];
   optionalRows: OptionalRow[];
   missing: string[];
@@ -1080,6 +1092,9 @@ function QuestionnaireSheet({
               canExport={canExport}
               rows={diagramRows}
               selectedMain={selectedMain}
+              mainChoices={mainChoices}
+              mainSchemeCode={mainSchemeCode}
+              onMainSchemeChange={onMainSchemeChange}
               channels={channels}
               optionalRows={optionalRows}
               missing={missing}
@@ -1273,6 +1288,9 @@ function DiagramResult({
   canExport,
   rows,
   selectedMain,
+  mainChoices,
+  mainSchemeCode,
+  onMainSchemeChange,
   channels,
   optionalRows,
   missing,
@@ -1284,6 +1302,9 @@ function DiagramResult({
   canExport: boolean;
   rows: DiagramRow[];
   selectedMain?: DiagramRow;
+  mainChoices: Array<{code: string; io: Record<string, number>; sourceRow: number}>;
+  mainSchemeCode: string;
+  onMainSchemeChange: (code: string) => void;
   channels: Channel[];
   optionalRows: OptionalRow[];
   missing: string[];
@@ -1299,6 +1320,18 @@ function DiagramResult({
     schemeCodes.length > 0;
   return (
     <div className="mt-6 space-y-6">
+      {(mainChoices.length > 1 || mainSchemeCode) && (
+        <label className="block text-sm font-medium text-[#40404a]">
+          Основная схема
+          <select aria-label="Основная схема" className="mt-2 w-full rounded-xl border border-[#dcd8ff] bg-white p-3 text-sm"
+            value={mainSchemeCode} onChange={event => onMainSchemeChange(event.target.value)}>
+            <option value="">Автоматический подбор</option>
+            {mainChoices.map(choice => <option key={`${choice.code}:${choice.sourceRow}`} value={choice.code}>
+              {choice.code} · {Object.entries(choice.io).filter(([, count]) => count > 0).map(([code, count]) => `${code} × ${count}`).join(', ')}
+            </option>)}
+          </select>
+        </label>
+      )}
       {requested && missing.length > 0 ? (
         <Notice>Не выбрано: {missing.join(', ')}.</Notice>
       ) : requested && !rows.length ? (

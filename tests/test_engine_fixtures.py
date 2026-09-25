@@ -51,6 +51,27 @@ def concise(calculation, expected):
 
 
 class FrozenEngineFixturesTests(unittest.TestCase):
+    def test_explicit_choice_reaches_each_replacement_template(self):
+        source = next(case for case in FIXTURES['cases'] if case['id'] == 'direct-motor')['motors'][0]
+        for code, di_family, do_family in (
+            ('im1-011', 'DI24-NPN', 'DOR-NO'),
+            ('im1-012', 'DI24-PNP', 'DOR-NO'),
+            ('im1-013', 'DI24-NPN', 'DOT-PNP'),
+            ('im1-014', 'DI24-PNP', 'DOT-PNP'),
+        ):
+            with self.subTest(code=code):
+                motor = copy.deepcopy(source)
+                motor['mainSchemeCode'] = code
+                result = calculate_cabinet([motor])
+                self.assertEqual(result['errors'], [])
+                self.assertEqual(result['blocks'][0]['main']['diagram1'], code)
+                self.assertEqual((result['io'][di_family], result['io'][do_family]), (1, 1))
+                self.assertEqual(len(result['blocks'][0]['mainChoices']), 4)
+        motor['mainSchemeCode'] = 'im1-999'
+        invalid = calculate_cabinet([motor])
+        self.assertFalse(invalid['canExport'])
+        self.assertTrue(any('im1-999' in error for error in invalid['errors']))
+
     def test_engine_cases(self):
         self.assertEqual(FIXTURES['format'], 1)
         for case in FIXTURES['cases']:
@@ -67,7 +88,9 @@ class FrozenEngineFixturesTests(unittest.TestCase):
             motor['tag'] = f'M{index + 1}'
             motors.append(motor)
         calculation = calculate_cabinet(motors)
-        self.assertEqual(calculation['errors'], [])
+        self.assertTrue(all('нет проверенного поля обозначения устройства' in error
+                            for error in calculation['errors']))
+        self.assertFalse(calculation['canExport'])
         self.assertEqual([item['ref'] for item in calculation['modules']], ['M1'])
         self.assertEqual([item['ref'] for item in calculation['plcHardware']], ['PLC', 'M1'])
         channels = [channel for block in calculation['blocks'] for channel in block['channels']]
@@ -80,9 +103,11 @@ class FrozenEngineFixturesTests(unittest.TestCase):
         case = next(case for case in FIXTURES['cases'] if case['id'] == 'direct-motor')
         result = calculate_cabinet(copy.deepcopy(case['motors']))
         self.assertTrue(result['instances'])
-        # The source OL has no diagram-head mapping for im1-014; direct-motor
-        # still must carry no invented header fields.
+        # The source OL has no diagram-head row for im1-014. Its supplied DWG
+        # carries the same keys, so values trace directly to active Ques 1 rows.
         self.assertEqual(result['instances'][0]['cadHeadRules'], [])
+        self.assertEqual(result['instances'][0]['cadFieldValues']['marking'], 'M1')
+        self.assertTrue(result['instances'][0]['cadFieldSources']['marking'].startswith('Ques 1:'))
 
         row = next(row for row in BASE['diagrams1'] if row['diagram1'] == 'im1-011')
         with patch.object(cabinet_engine, 'diagram_rows', return_value={'rows': [row], 'missing': []}):

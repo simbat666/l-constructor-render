@@ -48,13 +48,17 @@ def demands_for(counts):
     return [code for code, count in zip(CODES, counts) for _ in range(count)]
 
 
+def within_capacity(counts, module_count):
+    """Necessary capacity bounds before exact pin matching."""
+    return (sum(counts) <= BASE_AMOUNT + module_count * MODULE_AMOUNT and
+            all(count <= CATALOG['controller']['limits'][code] + module_count * CATALOG['module']['limits'][code]
+                for code, count in zip(CODES, counts)))
+
+
 @lru_cache(maxsize=8192)
 def feasible_match(counts, module_count):
     """Exact bipartite matching: one signal per resource on each device."""
-    if sum(counts) > BASE_AMOUNT + module_count * MODULE_AMOUNT:
-        return False
-    if any(count > CATALOG['controller']['limits'][code] + module_count * CATALOG['module']['limits'][code]
-           for code, count in zip(CODES, counts)):
+    if not within_capacity(counts, module_count):
         return False
     demands = demands_for(counts)
     by_code, _ = indexed_inventory(module_count)
@@ -159,7 +163,9 @@ def allocate_io(blocks):
                        for code, value in io.items()):
                     return dict(allocations=[], error=f"Некорректный I/O: {block['id']}, строка {candidate['sourceRow']}.")
                 updated = tuple(count + io.get(code, 0) for code, count in zip(CODES, counts))
-                if not feasible_match(updated, MAX_MODULES):
+                # Final states get exact matching. Demand counts can only grow,
+                # so a state beyond these bounds can never become feasible.
+                if not within_capacity(updated, MAX_MODULES):
                     continue
                 next_penalty = penalty + io.get('DI24-NPN', 0) * 2 + io.get('DI24-HSC-NPN', 0) * 2 + io.get('DOR-NO', 0)
                 path = (selected + [candidate], next_penalty, rows + (candidate['sourceRow'],))
@@ -168,9 +174,12 @@ def allocate_io(blocks):
         states = next_states
         if not states:
             return dict(allocations=[], error=f"Недостаточно совместимых выводов {CATALOG['controller']['brand']} {CATALOG['controller']['model']} и {MAX_MODULES} модулей для {block['id']}.")
-    counts, (selected, _, _) = min(states.items(), key=lambda item: (
-        min_modules(item[0]), sum(item[0]), item[1][1], item[1][2]))
-    module_count = min_modules(counts)
+    feasible = [(counts, path, module_count) for counts, path in states.items()
+                if (module_count := min_modules(counts)) is not None]
+    if not feasible:
+        return dict(allocations=[], error='Недостаточно совместимых выводов ПЛК для выбранных схем.')
+    counts, (selected, _, _), module_count = min(feasible, key=lambda item: (
+        item[2], sum(item[0]), item[1][1], item[1][2]))
     matched = pin_match(counts, module_count)
     if matched is None:
         return dict(allocations=[], error='Не удалось назначить совместимые выводы ПЛК.')

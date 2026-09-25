@@ -5,7 +5,7 @@ const CATALOG_STORAGE_VERSION = 2;
 const MAX_BLOCKS = 40;
 const MAX_NAME_LENGTH = 80;
 
-export type StoredMotor = { id: string; tag: string; cell: number; state: QuestionnaireState };
+export type StoredMotor = { id: string; tag: string; cell: number; state: QuestionnaireState; mainSchemeCode?: string };
 
 /** The field saved inside one workspace. It contains neither passwords nor CAD files. */
 export type StoredProject = { motors: StoredMotor[]; activeMotorId: string | null; sheetOpen: boolean };
@@ -73,7 +73,9 @@ function motor(value: unknown): StoredMotor | null {
     typeof source.tag !== 'string' || source.tag.length > 128 ||
     typeof cell !== 'number' || !Number.isInteger(cell) || cell < 0 || cell >= MAX_BLOCKS || !state
   ) return null;
-  return { id: source.id, tag: source.tag, cell, state };
+  const mainSchemeCode = typeof source.mainSchemeCode === 'string' && /^[A-Za-z0-9_-]{1,80}$/.test(source.mainSchemeCode)
+    ? source.mainSchemeCode : undefined;
+  return { id: source.id, tag: source.tag, cell, state, ...(mainSchemeCode ? { mainSchemeCode } : {}) };
 }
 
 function workspace(value: unknown): LocalWorkspace | null {

@@ -36,6 +36,17 @@ def complete():
     return dict(id='one', tag='M1', state=state)
 
 class EngineApiTests(unittest.TestCase):
+    def test_main_scheme_choice_is_validated_and_preserved(self):
+        motor = complete()
+        motor['mainSchemeCode'] = 'im1-011'
+        normalized = validate_project({'motors': [motor]})
+        self.assertEqual(normalized[0]['mainSchemeCode'], 'im1-011')
+        motor['mainSchemeCode'] = 'im1-999'
+        self.assertFalse(evaluate_project({'motors': [motor]})['calculation']['canExport'])
+        motor['mainSchemeCode'] = '../secret'
+        with self.assertRaises(ValueError):
+            validate_project({'motors': [motor]})
+
     @classmethod
     def setUpClass(cls):
         cls.server = ThreadingHTTPServer(('127.0.0.1', 0), api.Handler)

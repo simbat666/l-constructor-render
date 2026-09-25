@@ -55,70 +55,185 @@
     },
     {
       "code": "im1-011",
-      "sourceSha256": "8d1ccccfcd8d37ef73045c7bf458c11f4494da13824dd201d6127c5e748397a9",
-      "outputSource": "user-supplied im1-011.dxf (replaces converted DXF)",
+      "sourceSha256": "b42cc2997098a437e469a43ad787d2df0010286579b2ea62514b28186d14f130",
+      "outputSource": "AutoCAD Core Console DXF; removed 23 detached legacy HATCH entities outside current fragment",
       "output": {
         "dxfVersion": "AC1032",
-        "bytes": 273145,
-        "sha256": "716303d5a89312ae4799d2bcd3d26b5fd99fd4f4b4d926ca0b8d731fbbc8bd90",
-        "entityCount": 114,
+        "bytes": 180093,
+        "sha256": "7f59703013b6c102288b2afff03bbc950696b6648cc11dad11b679b42b55cabf",
+        "entityCount": 91,
         "auditErrors": 0,
         "extents": [
-          4483.147543915651,
-          5949.018344986801,
-          4679.0518702950585,
-          6161.322368121759
+          4543.366,
+          5955.567,
+          4632.44,
+          6167.871
+        ]
+      },
+      "preparation": {
+        "convertedSha256": "16985f6a92908fc6266897ca8c845a11952197dc897ee370273edb4447d3275d",
+        "removedOrphanHatchHandles": [
+          "12F5",
+          "12F7",
+          "12FB",
+          "12FD",
+          "12FF",
+          "1301",
+          "1303",
+          "1305",
+          "1307",
+          "1309",
+          "130B",
+          "130D",
+          "130F",
+          "1311",
+          "1313",
+          "1315",
+          "1317",
+          "1319",
+          "1321",
+          "132D",
+          "1331",
+          "1334",
+          "1337"
         ]
       }
     },
     {
       "code": "im1-012",
-      "sourceSha256": "466bf616f70c6a8d5d9751b619bb6e1a841b5bd135f2a3c31ac55f38c740903c",
+      "sourceSha256": "dab628ddd4851197b2c4bde0d192e452ef727820f5f045781db547bd6bb87573",
       "output": {
         "dxfVersion": "AC1032",
-        "bytes": 272172,
-        "sha256": "37bb6837faeadc60d5b632630e8e2313344e9a657a8dd58de66c455066a90fae",
-        "entityCount": 112,
+        "bytes": 180457,
+        "sha256": "792b85dbc6b151538950911f27853e61421f54fd7a93335d5ea9dbaec5f1f2df",
+        "entityCount": 93,
         "auditErrors": 0,
         "extents": [
-          4480.733,
-          5944.305,
-          4536.744,
-          6149.179
+          4689.841,
+          5942.676,
+          4778.915,
+          6154.98
+        ]
+      },
+      "outputSource": "AutoCAD Core Console DXF; removed 23 detached legacy HATCH entities outside current fragment",
+      "preparation": {
+        "convertedSha256": "b9f5dfbd8bb249786b318baa474fa5474317e327a367184557253d194ed787f9",
+        "removedOrphanHatchHandles": [
+          "12F5",
+          "12F7",
+          "12FB",
+          "12FD",
+          "12FF",
+          "1301",
+          "1303",
+          "1305",
+          "1307",
+          "1309",
+          "130B",
+          "130D",
+          "130F",
+          "1311",
+          "1313",
+          "1315",
+          "1317",
+          "1319",
+          "1321",
+          "132D",
+          "1331",
+          "1334",
+          "1337"
         ]
       }
     },
     {
       "code": "im1-013",
-      "sourceSha256": "4f3ebe3bfb3091b30b435d73776a0a1282b89490814133a93bc95a4e4330f015",
+      "sourceSha256": "09cae92daf5fa9538af151d8087cb0ff974328a30280aea13b005ac61f8cf85e",
       "output": {
         "dxfVersion": "AC1032",
-        "bytes": 272172,
-        "sha256": "34823c1df625abbdb27b359848f639c26e391b3dae768c049879417738257ee5",
-        "entityCount": 112,
+        "bytes": 180044,
+        "sha256": "6d5c7dd363c985c03e37f074c519721600afecdd89a85cc30b9b79eaaf2d1e97",
+        "entityCount": 91,
         "auditErrors": 0,
         "extents": [
-          4480.733,
-          5944.305,
-          4536.744,
-          6149.179
+          4743.75,
+          5953.331,
+          4826.476,
+          6165.635
+        ]
+      },
+      "outputSource": "AutoCAD Core Console DXF; removed 23 detached legacy HATCH entities outside current fragment",
+      "preparation": {
+        "convertedSha256": "f7655f85369c8f751bd096d4a90667e600e0b335430ac9f74768cbfaab8edac0",
+        "removedOrphanHatchHandles": [
+          "12F5",
+          "12F7",
+          "12FB",
+          "12FD",
+          "12FF",
+          "1301",
+          "1303",
+          "1305",
+          "1307",
+          "1309",
+          "130B",
+          "130D",
+          "130F",
+          "1311",
+          "1313",
+          "1315",
+          "1317",
+          "1319",
+          "1321",
+          "132D",
+          "1331",
+          "1334",
+          "1337"
         ]
       }
     },
     {
       "code": "im1-014",
-      "sourceSha256": "8e14c8c84cc12c429b3138b557652cbf297255c817fe10c0c2a5488205fd5efc",
+      "sourceSha256": "ad313137e27aaa1d7718474f99d6622777949200740f89071c163506066bf28c",
       "output": {
         "dxfVersion": "AC1032",
-        "bytes": 272172,
-        "sha256": "e97cded9cbf2a5e0b75c937721ef80dab34ef95f5a2bff44330b9c8db2229ba2",
-        "entityCount": 112,
+        "bytes": 187026,
+        "sha256": "f9eeb13af9c9948299e197aa5a350fa45588e8ba9d33e79b316b294f6479fdde",
+        "entityCount": 93,
         "auditErrors": 0,
         "extents": [
-          4480.733,
-          5944.305,
-          4536.744,
-          6149.179
+          4820.926,
+          5956.011,
+          4914.986,
+          6168.315
+        ]
+      },
+      "outputSource": "AutoCAD Core Console DXF; removed 23 detached legacy HATCH entities outside current fragment",
+      "preparation": {
+        "convertedSha256": "aff68c12d586345825a16333af8f7935add4f627fdeb570beaa800e666aa8f8a",
+        "removedOrphanHatchHandles": [
+          "12F5",
+          "12F7",
+          "12FB",
+          "12FD",
+          "12FF",
+          "1301",
+          "1303",
+          "1305",
+          "1307",
+          "1309",
+          "130B",
+          "130D",
+          "130F",
+          "1311",
+          "1313",
+          "1315",
+          "1317",
+          "1319",
+          "1321",
+          "132D",
+          "1331",
+          "1334",
+          "1337"
         ]
       }
     },

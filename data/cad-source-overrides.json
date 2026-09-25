@@ -1,7 +1,22 @@
 {
   "im1-011": {
     "file": "cad-sources/im1-011.dwg",
-    "sha256": "8d1ccccfcd8d37ef73045c7bf458c11f4494da13824dd201d6127c5e748397a9",
-    "provenance": "user-supplied im1-011.dwg"
+    "sha256": "b42cc2997098a437e469a43ad787d2df0010286579b2ea62514b28186d14f130",
+    "provenance": "user-supplied im1-011 [Pckday].dwg"
+  },
+  "im1-012": {
+    "file": "cad-sources/im1-012.dwg",
+    "sha256": "dab628ddd4851197b2c4bde0d192e452ef727820f5f045781db547bd6bb87573",
+    "provenance": "user-supplied im1-012.dwg"
+  },
+  "im1-013": {
+    "file": "cad-sources/im1-013.dwg",
+    "sha256": "09cae92daf5fa9538af151d8087cb0ff974328a30280aea13b005ac61f8cf85e",
+    "provenance": "user-supplied im1-013.dwg"
+  },
+  "im1-014": {
+    "file": "cad-sources/im1-014.dwg",
+    "sha256": "ad313137e27aaa1d7718474f99d6622777949200740f89071c163506066bf28c",
+    "provenance": "user-supplied im1-014.dwg"
   }
 }

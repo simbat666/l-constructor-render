@@ -14,7 +14,7 @@ export type QuestionNode = {
 export type VisibleGroup = {
   key: string; sheet: string; question: string; fieldType: string; nodes: QuestionNode[]; required: boolean;
 };
-export type ProjectMotor = { id: string; tag: string; state: QuestionnaireState };
+export type ProjectMotor = { id: string; tag: string; state: QuestionnaireState; mainSchemeCode?: string };
 type TraceEntry = { id: string; title: string; detail: string; source?: string };
 type SchemeRow = Record<string, any>;
 export type Channel = {
@@ -26,6 +26,7 @@ export type Calculation = {
   schemaVersion: number; ruleFingerprint: string; status: string;
   blocks: Array<ProjectMotor & {
     errors: string[]; warnings: string[]; main?: SchemeRow;
+    mainChoices: Array<{code: string; io: Record<string, number>; sourceRow: number}>;
     optional: Array<{row: SchemeRow; sourceOrder: string}>; channels: Channel[];
     loadIndex: string | null; specification: Array<{name: string; quantity: number; unit: string; source: string}>;
     decisionTrace: { inputs: TraceEntry[]; rules: TraceEntry[]; outputs: TraceEntry[] };
@@ -49,7 +50,7 @@ export function numericInputRule(rule: string | null) {
 }
 
 export function projectVersion(motors: ProjectMotor[]) {
-  return JSON.stringify(motors.map(({id, tag, state}) => ({id, tag, state})));
+  return JSON.stringify(motors.map(({id, tag, state, mainSchemeCode}) => ({id, tag, state, ...(mainSchemeCode ? {mainSchemeCode} : {})})));
 }
 
 export function useEngineering(motors: ProjectMotor[], accept: (motors: ProjectMotor[]) => void) {
