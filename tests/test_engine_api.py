@@ -132,7 +132,7 @@ class EngineApiTests(unittest.TestCase):
                     document = ezdxf.read(io.StringIO(response.read().decode('utf-8')))
                 self.assertFalse(document.audit().has_errors)
                 labels = [e.dxf.text for e in document.modelspace().query('TEXT') if e.dxf.text.startswith('DRAFT')]
-                self.assertEqual(len(labels), 2)
+                self.assertEqual(len(labels), 6 if drawing['kind'] == 'electrical' else 2)
             with urlopen(self.url + result['downloadPath']) as response:
                 with zipfile.ZipFile(io.BytesIO(response.read())) as archive:
                     manifest_name = next(name for name in archive.namelist() if name.endswith('.json'))

@@ -20,7 +20,7 @@ type SchemeRow = Record<string, any>;
 export type Channel = {
   family: string; address: string; terminals: string[]; group: string;
   deviceRef: string; terminalStatus: 'source' | 'testDerived';
-  commonKey: string | null; commonRef: string | null; source: string;
+  commonKey: string | null; commonDesignation: string | null; commonRef: string | null; source: string;
 };
 export type Calculation = {
   schemaVersion: number; ruleFingerprint: string; status: string;

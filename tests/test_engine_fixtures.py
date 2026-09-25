@@ -51,6 +51,17 @@ def concise(calculation, expected):
 
 
 class FrozenEngineFixturesTests(unittest.TestCase):
+    def test_io_summary_keeps_device_separate_from_terminal_and_common(self):
+        case = next(case for case in FIXTURES['cases'] if case['id'] == 'direct-motor')
+        result = calculate_cabinet(copy.deepcopy(case['motors']))
+        block = result['blocks'][0]
+        detail = next(item['detail'] for item in block['decisionTrace']['outputs'] if item['id'] == 'io')
+        for channel in block['channels']:
+            self.assertIn(f"{channel['deviceRef']} · {channel['family']} · клемма {' / '.join(channel['terminals'])}", detail)
+            if channel['commonDesignation']:
+                self.assertIn(f"общий {channel['commonDesignation']}", detail)
+        self.assertNotIn('PLC:', detail)
+
     def test_explicit_choice_reaches_each_replacement_template(self):
         source = next(case for case in FIXTURES['cases'] if case['id'] == 'direct-motor')['motors'][0]
         for code, di_family, do_family in (

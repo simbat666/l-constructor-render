@@ -189,7 +189,10 @@ def calculate_cabinet(motors):
         if block['loadIndex']:
             outputs.append(dict(id='load-index', title='Индекс нагрузки', detail=block['loadIndex'], source=load_rule['source']))
         if block['channels']:
-            outputs.append(dict(id='io', title='Выводы ПЛК', detail=', '.join(f"{c['deviceRef']}:{c['address']} · {c['family']}" for c in block['channels'])))
+            outputs.append(dict(id='io', title='Выводы ПЛК', detail=', '.join(
+                f"{c['deviceRef']} · {c['family']} · клемма {' / '.join(c['terminals'])}"
+                + (f" · общий {c['commonDesignation']}" if c.get('commonDesignation') else '')
+                for c in block['channels'])))
         for item in block['specification']:
             outputs.append(dict(id=f"spec:{item['source']}:{item['name']}", title=item['name'], detail=f"{fmt(item['quantity'])} {item['unit']}", source=item['source']))
         block['decisionTrace'] = dict(inputs=inputs, rules=rules, outputs=outputs)

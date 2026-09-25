@@ -1340,7 +1340,7 @@ function DiagramResult({
         <>
           <p className="text-sm text-[#747480]">
             Выбран вариант схемы и назначены выводы контроллера и, если нужны, модулей.
-            Обозначение перед номером вывода показывает устройство.
+            Устройство, номер клеммы и общий вывод показаны отдельно.
           </p>
           <DiagramTable
             rows={[{ row: selectedMain, sourceOrder: 'I/O optimizer' }]}
@@ -1352,7 +1352,7 @@ function DiagramResult({
               </p>
               <p className="mt-2 font-mono leading-5">
                 {channels
-                  .map((channel) => [`${channel.deviceRef}:${channel.terminals.join(' / ')}`, channel.family, channel.commonRef].filter(Boolean).join(' · '))
+                  .map((channel) => [channel.deviceRef, channel.family, `клемма ${channel.terminals.join(' / ')}`, channel.commonDesignation && `общий ${channel.commonDesignation}`].filter(Boolean).join(' · '))
                   .join('\n')}
               </p>
             </div>
