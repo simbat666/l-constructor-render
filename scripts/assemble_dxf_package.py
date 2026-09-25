@@ -19,6 +19,7 @@ from pathlib import Path
 
 import ezdxf
 from ezdxf import bbox, transform, xref
+from ezdxf.enums import TextEntityAlignment
 from ezdxf.math import Matrix44
 
 
@@ -51,6 +52,57 @@ FORMAT_PREFIX = re.compile(r'^\\[^;]*;')
 def mtext_plain(entity):
     """Read just the visible designation text, retaining source formatting."""
     return FORMAT_PREFIX.sub('', entity.text).strip()
+
+
+def place_terminal_label(code, field, entity, modelspace, value, module_ref=None):
+    """Center a selected terminal on its source-locked conductor and box."""
+    box = modelspace.doc.entitydb.get(field.get('boxHandle'))
+    line = modelspace.doc.entitydb.get(field.get('lineHandle'))
+    if (box is None or box.dxftype() != 'LWPOLYLINE' or box not in modelspace
+            or line is None or line.dxftype() != 'LINE' or line not in modelspace):
+        raise ValueError(f'{code}: нет проверенной геометрии клеммы {field["role"]}')
+    points = list(box.get_points('xy'))
+    if len(points) != 4:
+        raise ValueError(f'{code}: изменилась рамка клеммы {field["role"]}')
+    left, right = min(p[0] for p in points), max(p[0] for p in points)
+    low, high = min(p[1] for p in points), max(p[1] for p in points)
+    axis = (left + right) / 2
+    if (abs(right - left - 5) > .01 or abs(high - low - 4.902) > .01
+            or abs(line.dxf.start.x - axis) > .01 or abs(line.dxf.end.x - axis) > .01
+            or not (left < entity.dxf.insert.x < right and low < entity.dxf.insert.y < high)):
+        raise ValueError(f'{code}: линия клеммы {field["role"]} не совпала с шаблоном')
+    if field['role'].startswith('plc.'):
+        # A four-character pin such as Q1-1 needs more than the original 5 mm.
+        # Adjacent PLC boxes have 11.24 mm or more between their axes.
+        half_width = 4.5
+        box.set_points([(axis - half_width if x < axis else axis + half_width, y)
+                        for x, y in points], format='xy')
+    else:
+        half_width = 2.5
+    entity.text = value
+    entity.dxf.insert = (axis, (low + high) / 2, entity.dxf.insert.z)
+    entity.dxf.attachment_point = 5  # middle center, directly on conductor axis
+    entity.dxf.width = 0  # no automatic wrapping inside the old narrow MTEXT width
+    entity.dxf.char_height = 1.8
+    # ezdxf may retain the source MTEXT's old glyph extents after replacing
+    # its content. Measure a fresh temporary entity with the same font.
+    probe = modelspace.add_mtext(value, dxfattribs={
+        'style': entity.dxf.style, 'char_height': entity.dxf.char_height,
+        'width': 0, 'attachment_point': 5,
+    })
+    measured = bbox.extents([probe], fast=True)
+    modelspace.delete_entity(probe)
+    if measured.has_data and measured.size.x > 2 * half_width - .5:
+        entity.dxf.char_height *= (2 * half_width - .5) / measured.size.x
+    if entity.dxf.char_height < 1.1:
+        raise ValueError(f'{code}: надпись {value} не помещается в клемме {field["role"]}')
+    if module_ref:
+        owner = modelspace.add_text(module_ref, dxfattribs={
+            'layer': entity.dxf.layer, 'height': 1.2, 'style': entity.dxf.style,
+        })
+        owner.set_placement((axis, high + 1.5), align=TextEntityAlignment.MIDDLE_CENTER)
+        return owner.dxf.handle
+    return None
 
 
 def load_field_contract(path: Path = FIELD_CONTRACT):
@@ -181,19 +233,18 @@ def apply_template_contract(code, modelspace, source_sha256, instance, counters)
     if len(di) != 1 or len(do) != 1 or len(do[0].get('terminals', [])) != expected_output_terminals:
         raise ValueError(f'{code}: требуется один {signals["di"]} и один {signals["do"]}')
     for channel in (di[0], do[0]):
-        if channel.get('deviceRef', 'PLC') != 'PLC':
-            continue  # The separate module schedule carries this assignment.
+        module_ref = channel.get('deviceRef', 'PLC') != 'PLC'
         common = channel.get('commonDesignation')
         common_key = channel.get('commonKey') or ('#' + common if common else None)
         if common and common_key != '#' + common:
-            raise ValueError(f'{code}: обозначение общего вывода не соответствует выбранной строке ПЛК')
-        matched_rows = [option for option in catalog['pinOptions']
+            raise ValueError(f'{code}: обозначение общего вывода не соответствует выбранной строке выводов')
+        matched_rows = [option for option in catalog['modulePinOptions' if module_ref else 'pinOptions']
                         if option['code'] == channel['family']
                         and option['terminals'] == channel.get('terminals')
                         and option['commonDesignation'] == common
                         and option['commonKey'] == common_key]
         if len(matched_rows) != 1 or channel.get('address') != matched_rows[0]['terminals'][0]:
-            raise ValueError(f'{code}: пара вывод/GND для {channel["family"]} отсутствует в таблице ПЛК')
+            raise ValueError(f'{code}: пара вывод/GND для {channel["family"]} отсутствует в таблице выводов')
     if not di[0].get('commonDesignation') or not di[0].get('address'):
         raise ValueError(f'{code}: не подтверждены общий вывод и клемма {signals["di"]}')
     if 'plc.do.common' in by_role and not do[0].get('commonDesignation'):
@@ -266,16 +317,23 @@ def apply_template_contract(code, modelspace, source_sha256, instance, counters)
             if not isinstance(value, str) or not value.strip() or len(value) > 100 or any(ord(c) < 32 for c in value):
                 raise ValueError(f'{code}: некорректное значение {key}')
             values[field['role']] = value.strip()
+        else:
+            # These OL questionnaire answers are optional. An empty answer is
+            # an empty label, not an unresolved CAD template marker.
+            values[field['role']] = ''
     trace = []
     for field in fields:
         before = field['text']
         module_ref = module_fields.get(field['role'])
-        after = before if module_ref else values.get(field['role'], before)
-        unresolved = bool(module_ref) or (field['role'].startswith('header.') and field['role'] not in values)
+        after = values.get(field['role'], before)
+        unresolved = field['role'].startswith('header.') and field['role'] not in values
         if not unresolved and field['role'] not in values:
             raise ValueError(f'{code}: неизвестная роль поля {field["role"]}')
         entity = entities[field['handle']]
-        if after != before:
+        owner_handle = None
+        if field['role'].startswith(('plc.', 'terminal.')):
+            owner_handle = place_terminal_label(code, field, entity, modelspace, after, module_ref)
+        elif after != before:
             entity.text = entity.text.replace(before, after)
         if field.get('offsetY'):
             position = entity.dxf.insert
@@ -285,8 +343,9 @@ def apply_template_contract(code, modelspace, source_sha256, instance, counters)
             'before': before, 'after': after,
             'placeholderHandle': field['handle'],
             'offsetY': field.get('offsetY', 0),
-            'status': 'unresolved' if unresolved else 'applied',
+            'status': 'unresolved' if unresolved else 'empty-optional' if after == '' else 'applied',
             'assignedModule': module_ref,
+            'ownerHandle': owner_handle,
             'ruleSource': (f"diagram head:{head_by_key[field['diagramKey']]['sourceRow']}"
                            if field.get('diagramKey') in head_by_key else
                            (instance.get('cadFieldSources') or {}).get(
@@ -297,7 +356,7 @@ def apply_template_contract(code, modelspace, source_sha256, instance, counters)
 
 
 def merge_repeated_commons(code, modelspace, applied_fields, visible_commons, instance_id):
-    """Keep one complete, isolated common branch per PLC/common on a page.
+    """Keep one complete, isolated common branch per device/common on a page.
 
     The source-locked contract names the exact label, box, vertical conductor,
     and lower endpoint.  A duplicate is removed as a whole; other wires in the
@@ -314,11 +373,10 @@ def merge_repeated_commons(code, modelspace, applied_fields, visible_commons, in
     for field in common_fields:
         role = field['fieldId']
         module_ref = field.get('assignedModule')
-        if not module_ref:
-            key = ('PLC', field['after'])
-            if key not in visible_commons:
-                visible_commons[key] = {'sourceCode': code, 'role': role, 'instanceId': instance_id}
-                continue
+        key = (module_ref or 'PLC', field['after'])
+        if key not in visible_commons:
+            visible_commons[key] = {'sourceCode': code, 'role': role, 'instanceId': instance_id}
+            continue
         handles = branches[role]
         if len(handles) != 5 or handles[0] != field['placeholderHandle']:
             raise ValueError(f'{code}: неполная карта ветви {role}')
@@ -329,11 +387,11 @@ def merge_repeated_commons(code, modelspace, applied_fields, visible_commons, in
             raise ValueError(f'{code}: изменилась геометрия ветви {role}')
         for entity in entities:
             modelspace.delete_entity(entity)
-        field['status'] = 'suppressedModuleCommon' if module_ref else 'shared-common'
-        field['after'] = '' if module_ref else field['after']
+        if field.get('ownerHandle'):
+            modelspace.delete_entity(modelspace.doc.entitydb[field['ownerHandle']])
+        field['status'] = 'shared-common'
         field['removedEntityHandles'] = handles
-        if not module_ref:
-            field['sharedWith'] = visible_commons[key]
+        field['sharedWith'] = visible_commons[key]
         removed += 1
     return removed
 
@@ -516,6 +574,8 @@ def prepare_grouped_electrical(prepared, instances):
             part_doc = copy.deepcopy(document)
             part_model = part_doc.modelspace()
             handles = set(groups[kind])
+            handles.update(field['ownerHandle'] for field in fields
+                           if field.get('ownerHandle') and field['placeholderHandle'] in handles)
             for entity in list(part_model):
                 if entity.dxf.handle not in handles:
                     part_model.delete_entity(entity)

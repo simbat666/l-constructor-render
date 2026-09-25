@@ -35,13 +35,17 @@
       "handle": "15B6",
       "layer": "XT7",
       "text": "#XT1",
-      "role": "terminal.xt1.1"
+      "role": "terminal.xt1.1",
+      "boxHandle": "15B5",
+      "lineHandle": "15B3"
     },
     {
       "handle": "15B9",
       "layer": "XT7",
       "text": "#XT2",
-      "role": "terminal.xt1.2"
+      "role": "terminal.xt1.2",
+      "boxHandle": "15B7",
+      "lineHandle": "15B4"
     },
     {
       "handle": "15D9",
@@ -97,25 +101,33 @@
       "handle": "15DB",
       "layer": "XT1",
       "text": "#GND1",
-      "role": "plc.common"
+      "role": "plc.common",
+      "boxHandle": "15DA",
+      "lineHandle": "15F3"
     },
     {
       "handle": "15FD",
       "layer": "XT1",
       "text": "#DI24-NPN",
-      "role": "plc.di"
+      "role": "plc.di",
+      "boxHandle": "15FC",
+      "lineHandle": "15F7"
     },
     {
       "handle": "1607",
       "layer": "XT1",
       "text": "#DOR-NO",
-      "role": "plc.do.1"
+      "role": "plc.do.1",
+      "boxHandle": "15FE",
+      "lineHandle": "15F8"
     },
     {
       "handle": "1609",
       "layer": "XT1",
       "text": "#DOR-NO",
-      "role": "plc.do.2"
+      "role": "plc.do.2",
+      "boxHandle": "1608",
+      "lineHandle": "160C"
     }
   ],
   "commonBranches": {

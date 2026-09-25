@@ -299,7 +299,76 @@ class CadTests(unittest.TestCase):
                 self.assertFalse(any(item['status'] == 'unresolved' for item in trace))
                 self.assertEqual(changed.get('plc.do.common'), 'GND3' if do_family == 'DOT-PNP' else None)
                 self.assertEqual(changed.get('plc.do.2'), 'Q1-2' if do_family == 'DOR-NO' else None)
+                self.assertFalse(any('#' in item.plain_text() for item in document.modelspace().query('MTEXT')))
+                contract = json.loads((ROOT / 'data/cad-template-contracts' / f'{code}.json').read_text())
+                for field in contract['fields']:
+                    if not field['role'].startswith(('plc.', 'terminal.')):
+                        continue
+                    label = document.entitydb[field['handle']]
+                    line = document.entitydb[field['lineHandle']]
+                    box = document.entitydb[field['boxHandle']]
+                    xs = [point[0] for point in box.get_points('xy')]
+                    ys = [point[1] for point in box.get_points('xy')]
+                    self.assertAlmostEqual(label.dxf.insert.x, line.dxf.start.x)
+                    self.assertAlmostEqual(label.dxf.insert.y, (min(ys) + max(ys)) / 2)
+                    self.assertEqual(label.dxf.attachment_point, 5)
+                    self.assertEqual(label.dxf.width, 0)
+                    self.assertGreater(label.dxf.char_height, 1.1)
+                    probe = document.modelspace().add_mtext(label.plain_text(), dxfattribs={
+                        'style': label.dxf.style, 'char_height': label.dxf.char_height,
+                        'width': 0, 'attachment_point': 5,
+                    })
+                    self.assertLessEqual(ezdxf.bbox.extents([probe], fast=True).size.x,
+                                         max(xs) - min(xs) - .49)
+                    document.modelspace().delete_entity(probe)
                 self.assertFalse(document.audit().has_errors)
+
+    def test_empty_optional_headers_and_module_pins_leave_no_template_markers(self):
+        code = 'im1-014'
+        heads = template_heads(code)
+        for rule in heads:
+            if rule['keyDiagram'] in ('Imd-1', 'Imd-2'):
+                rule['value'] = None
+        instance = dict(id='m1', tag='M1', code=code, drawingKind='electrical',
+                        channels=[
+                            dict(family='DI24-PNP', address='U1', terminals=['U1'],
+                                 deviceRef='M1', commonDesignation='GND3'),
+                            dict(family='DOT-PNP', address='U7', terminals=['U7'],
+                                 deviceRef='PLC', commonDesignation='GND3'),
+                        ], cadHeadRules=heads)
+        with tempfile.TemporaryDirectory(prefix='l-module-complete-labels-') as directory:
+            root = Path(directory)
+            manifest = root / 'manifest.json'
+            manifest.write_text(json.dumps({'instances': [instance], 'plcHardware': [
+                {'ref': 'M1', 'brand': 'ZENTEC', 'model': 'M245 no display'}]}), encoding='utf-8')
+            assembler.build_bundle([instance], root / 'result.zip', manifest)
+            drawing = ezdxf.readfile(root / 'result-electrical.dxf')
+            self.assertFalse(drawing.audit().has_errors)
+            labels = [entity.plain_text() for entity in drawing.modelspace().query('MTEXT')]
+            self.assertFalse(any('#' in label for label in labels))
+            self.assertGreaterEqual(labels.count('GND3'), 2)  # PLC and M1 are separate commons.
+            self.assertTrue(any(entity.dxf.text == 'M1' for entity in drawing.modelspace().query('TEXT')))
+            selected = [entity for entity in drawing.modelspace().query('MTEXT')
+                        if entity.plain_text() in ('U1', 'U7', 'GND3')
+                        and assembler.source_layer_name(entity.dxf.layer) == 'XT1']
+            self.assertEqual(len(selected), 4)
+            for label in selected:
+                boxes = [entity for entity in drawing.modelspace().query('LWPOLYLINE')
+                         if len(entity) == 4
+                         and abs((min(p[0] for p in entity.get_points('xy'))
+                                  + max(p[0] for p in entity.get_points('xy'))) / 2
+                                 - label.dxf.insert.x) < .01
+                         and abs((min(p[1] for p in entity.get_points('xy'))
+                                  + max(p[1] for p in entity.get_points('xy'))) / 2
+                                 - label.dxf.insert.y) < .01]
+                self.assertEqual(len(boxes), 1)
+            trace = json.loads((root / 'result-manifest.json').read_text())['cadParameterization']['fields']
+            marked = {field['fieldId']: field for field in trace}
+            self.assertEqual(marked['plc.di']['after'], 'U1')
+            self.assertEqual(marked['plc.di']['assignedModule'], 'M1')
+            self.assertEqual(marked['plc.common']['status'], 'applied')
+            self.assertEqual(marked['header.marking']['status'], 'empty-optional')
+            self.assertEqual(marked['header.deviceTag']['status'], 'empty-optional')
 
     def test_im1_011_source_and_field_contract_match(self):
         source = ROOT / 'data/dxf-sources/im1-011.dxf'
@@ -423,10 +492,11 @@ class CadTests(unittest.TestCase):
         trace = assembler.apply_template_contract('im1-011',
             ezdxf.readfile(assembler.DEFAULT_DXF_SOURCES / 'im1-011.dxf').modelspace(),
             source_hash, module_instance, {})
-        unresolved = {field['fieldId']: field for field in trace if field['status'] == 'unresolved'}
-        self.assertEqual(unresolved['plc.di']['assignedModule'], 'M1')
-        self.assertEqual(unresolved['plc.common']['assignedModule'], 'M1')
-        self.assertNotIn('plc.do.1', unresolved)
+        module_fields = {field['fieldId']: field for field in trace if field['assignedModule']}
+        self.assertEqual((module_fields['plc.di']['after'], module_fields['plc.di']['assignedModule']), ('07', 'M1'))
+        self.assertEqual((module_fields['plc.common']['after'], module_fields['plc.common']['assignedModule']), ('GND1', 'M1'))
+        self.assertTrue(all(field['ownerHandle'] for field in module_fields.values()))
+        self.assertFalse(any(field['status'] == 'unresolved' for field in trace))
         wrong_pair = copy.deepcopy(instances[0])
         wrong_pair['channels'][0].update(address='13', terminals=['13'], commonKey='#GND1', commonDesignation='GND1')
         with self.assertRaisesRegex(ValueError, 'пара вывод/GND'):
@@ -457,13 +527,13 @@ class CadTests(unittest.TestCase):
             self.assertGreaterEqual(len(frame_numbers), 2)
             package = json.loads((root / 'result-manifest.json').read_text(encoding='utf-8'))
             self.assertEqual([item['ref'] for item in package['cadModuleSheets']], ['M1'])
-            unresolved = {item['fieldId']: item for item in package['cadParameterization']['fields']
-                          if item['status'] == 'unresolved'}
-            self.assertEqual(unresolved['plc.do.1']['assignedModule'], 'M1')
-            self.assertEqual(unresolved['plc.do.2']['assignedModule'], 'M1')
-            self.assertNotIn('plc.di', unresolved)
+            marked = {item['fieldId']: item for item in package['cadParameterization']['fields']}
+            self.assertEqual((marked['plc.do.1']['after'], marked['plc.do.2']['after']), ('Q1-1', 'Q1-2'))
+            self.assertEqual((marked['plc.do.1']['assignedModule'], marked['plc.do.2']['assignedModule']), ('M1', 'M1'))
+            self.assertFalse(any(item['status'] == 'unresolved' for item in marked.values()))
+            self.assertFalse(any('#' in item.plain_text() for item in document.modelspace().query('MTEXT')))
 
-    def test_module_common_marker_is_hidden_on_motor_sheet(self):
+    def test_module_common_is_labeled_on_motor_sheet(self):
         selected = assembler.load_selected(assembler.DEFAULT_LIBRARY, assembler.DEFAULT_DXF_SOURCES, ['im1-012'])
         profile = json.loads(assembler.PROFILES.read_text(encoding='utf-8'))['electrical']
         pages = assembler.split_pages(assembler.load_and_validate(selected, profile), profile)
@@ -477,9 +547,10 @@ class CadTests(unittest.TestCase):
             assembler.assemble(pages, output, [instance], profile=profile, parameter_trace=trace)
             document = ezdxf.readfile(output)
             self.assertFalse(document.audit().has_errors)
-            self.assertFalse(any(e.plain_text().strip() == '#GND1' for e in document.modelspace().query('MTEXT')))
-            self.assertTrue(any(field['status'] == 'suppressedModuleCommon' and field['assignedModule'] == 'M1'
+            self.assertTrue(any(e.plain_text().strip() == 'GND1' for e in document.modelspace().query('MTEXT')))
+            self.assertTrue(any(field['status'] == 'applied' and field['assignedModule'] == 'M1'
                                 for field in trace))
+            self.assertTrue(any(e.dxf.text == 'M1' for e in document.modelspace().query('TEXT')))
 
     def test_four_motor_templates_use_selected_pin_and_its_own_common(self):
         heads = json.loads((ROOT / 'data/motor-v2.json').read_text(encoding='utf-8'))['diagramHeads']
@@ -579,6 +650,9 @@ class CadTests(unittest.TestCase):
             for kind, forbidden in [('electrical', 'im2-1'), ('external', 'im1-014')]:
                 document = ezdxf.readfile(root / f'result-{kind}.dxf')
                 self.assertFalse(document.audit().has_errors)
+                if kind == 'electrical':
+                    self.assertFalse(any('#' in entity.plain_text()
+                                         for entity in document.modelspace().query('MTEXT')))
                 labels = [entity.dxf.text for entity in document.modelspace().query('TEXT') if entity.dxf.text.startswith('DRAFT')]
                 self.assertEqual(len(labels), 24 if kind == 'electrical' else 8)
                 self.assertFalse(any(forbidden in label for label in labels))
