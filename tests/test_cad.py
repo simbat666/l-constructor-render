@@ -257,10 +257,39 @@ class CadTests(unittest.TestCase):
                 assembler.load_and_validate(selected)[0][4], {'tag': 'M1', 'channels': []}, {})
         module_instance = copy.deepcopy(instances[0])
         module_instance['channels'][0]['deviceRef'] = 'M1'
-        with self.assertRaisesRegex(ValueError, 'маркировки вывода модуля'):
-            assembler.apply_template_contract('im1-011',
-                ezdxf.readfile(assembler.DEFAULT_DXF_SOURCES / 'im1-011.dxf').modelspace(),
-                source_hash, module_instance, {})
+        trace = assembler.apply_template_contract('im1-011',
+            ezdxf.readfile(assembler.DEFAULT_DXF_SOURCES / 'im1-011.dxf').modelspace(),
+            source_hash, module_instance, {})
+        unresolved = {field['fieldId']: field for field in trace if field['status'] == 'unresolved'}
+        self.assertEqual(unresolved['plc.di']['assignedModule'], 'M1')
+        self.assertEqual(unresolved['plc.inputCommon']['assignedModule'], 'M1')
+        self.assertNotIn('plc.do.1', unresolved)
+
+    def test_module_assignment_adds_a_separate_named_sheet(self):
+        channels = [dict(family='DI24-PNP', address='06', terminals=['06'], deviceRef='PLC', commonDesignation='GND1'),
+                    dict(family='DOR-NO', address='Q1-1', terminals=['Q1-1', 'Q1-2'], deviceRef='M1', commonDesignation=None)]
+        instance = dict(id='motor-6:1', tag='M6', code='im1-012', drawingKind='electrical', channels=channels,
+                        cadHeadRules=[], cadFieldValues={'processDeviceType': 'Насос', 'marking': 'M6', 'deviceTag': 'M6'},
+                        cadFieldSources={'processDeviceType': 'Ques 1:20', 'marking': 'Ques 1:21', 'deviceTag': 'Ques 1:22'})
+        with tempfile.TemporaryDirectory(prefix='l-module-sheet-') as directory:
+            root = Path(directory)
+            manifest = root / 'manifest.json'
+            manifest.write_text(json.dumps({'instances': [instance], 'plcHardware': [
+                {'ref': 'M1', 'brand': 'ZENTEC', 'model': 'M245 no display'}]}), encoding='utf-8')
+            assembler.build_bundle([instance], root / 'result.zip', manifest)
+            document = ezdxf.readfile(root / 'result-electrical.dxf')
+            self.assertFalse(document.audit().has_errors)
+            labels = [item.dxf.text for item in document.modelspace().query('TEXT')]
+            self.assertTrue(any('ДОП. МОДУЛЬ M1' in label for label in labels))
+            frame_numbers = [item for item in document.modelspace().query('MTEXT') if item.plain_text().strip() in ('1', '2')]
+            self.assertGreaterEqual(len(frame_numbers), 2)
+            package = json.loads((root / 'result-manifest.json').read_text(encoding='utf-8'))
+            self.assertEqual([item['ref'] for item in package['cadModuleSheets']], ['M1'])
+            unresolved = {item['fieldId']: item for item in package['cadParameterization']['fields']
+                          if item['status'] == 'unresolved'}
+            self.assertEqual(unresolved['plc.do.1']['assignedModule'], 'M1')
+            self.assertEqual(unresolved['plc.do.2']['assignedModule'], 'M1')
+            self.assertNotIn('plc.di', unresolved)
 
     def test_separate_document_sets_and_multipage_frames(self):
         instances = api.validate_instances({'instances': [

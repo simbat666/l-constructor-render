@@ -150,7 +150,7 @@ class Handler(BaseHTTPRequestHandler):
             OUTPUT.mkdir(parents=True, exist_ok=True)
             target = OUTPUT / filename
             manifest = target.with_suffix(".json")
-            manifest.write_text(json.dumps({"schemaVersion": 2, "status": "draft", "instances": instances, "ruleFingerprint": calculation['ruleFingerprint'], "project": evaluated['calculation']['blocks'], "notice": "Server-calculated electrical and external drawing sets. Template composition, not released electrical documentation."}, ensure_ascii=False, indent=2), encoding="utf-8")
+            manifest.write_text(json.dumps({"schemaVersion": 2, "status": "draft", "instances": instances, "plcHardware": calculation['plcHardware'], "ruleFingerprint": calculation['ruleFingerprint'], "project": evaluated['calculation']['blocks'], "notice": "Server-calculated electrical and external drawing sets. Template composition, not released electrical documentation."}, ensure_ascii=False, indent=2), encoding="utf-8")
             if not GENERATION_SLOTS.acquire(blocking=False):
                 json_response(self, HTTPStatus.SERVICE_UNAVAILABLE, {"error": "Генератор занят. Повтори запрос через несколько секунд."})
                 return

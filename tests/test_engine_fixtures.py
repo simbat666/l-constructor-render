@@ -88,9 +88,9 @@ class FrozenEngineFixturesTests(unittest.TestCase):
             motor['tag'] = f'M{index + 1}'
             motors.append(motor)
         calculation = calculate_cabinet(motors)
-        self.assertTrue(all('нет проверенного поля обозначения устройства' in error
-                            for error in calculation['errors']))
-        self.assertFalse(calculation['canExport'])
+        self.assertEqual(calculation['errors'], [])
+        self.assertTrue(calculation['canExport'])
+        self.assertTrue(any('отдельный лист' in warning for warning in calculation['warnings']))
         self.assertEqual([item['ref'] for item in calculation['modules']], ['M1'])
         self.assertEqual([item['ref'] for item in calculation['plcHardware']], ['PLC', 'M1'])
         channels = [channel for block in calculation['blocks'] for channel in block['channels']]

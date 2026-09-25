@@ -122,11 +122,6 @@ def calculate_cabinet(motors):
                 head_rules = [dict(rule, value=cad_fields[{'Imd-3': 'processDeviceType', 'Imd-1': 'marking', 'Imd-2': 'deviceTag'}[rule['keyDiagram']]])
                               for rule in BASE.get('diagramHeads', []) if rule['code'] == code.strip()]
                 instances.append(dict(drawingKind='electrical' if index == 0 else 'external', id=f"{demand['id']}:{index + 1}", blockId=block['id'], tag=block['tag'], code=code.strip(), source=f"{demand['source']}:{allocation['scheme']['sourceRow']}", channels=allocation['channels'], cadHeadRules=head_rules, cadFieldValues=cad_fields, cadFieldSources=cad_field_sources))
-    for instance in instances:
-        if instance['code'] in ('im1-011', 'im1-012', 'im1-013', 'im1-014') and instance['drawingKind'] == 'electrical' and any(
-                channel['deviceRef'] != 'PLC' and channel['family'] in ('DI24-NPN', 'DI24-PNP', 'DOR-NO', 'DOT-PNP')
-                for channel in instance['channels']):
-            errors.append(f"{instance['tag']}: {instance['code']}: для вывода модуля нет проверенного поля обозначения устройства на схеме.")
     for block in blocks:
         if not block.get('main'):
             continue
@@ -203,6 +198,7 @@ def calculate_cabinet(motors):
         'DXF — черновая компоновка шаблонов, не выпущенная КД. Для im1-011…014 маркируются выводы ПЛК, ХТ1, QF/KM и заголовки; номиналы и электрические соединения ещё не параметризованы.',
         'Выводы ПЛК и тестовых модулей распределены по таблице ключей. Физическое объединение GND/COM и связи с внешней схемой ещё не рассчитаны.',
         *(['Номера клемм M245 no display в тестовом листе составлены по образцу M245; нужна сверка с паспортом модуля.'] if modules else []),
+        *(['Для назначенных выводов модулей добавляется отдельный лист с обозначением модуля. Его геометрия и клеммы в DXF пока не параметризованы.'] if modules else []),
     ], controllerFamily=plan['controller'] if plan else None,
        modules=modules,
        plcHardware=([dict(ref='PLC', brand=CATALOG['controller']['brand'], model=CATALOG['controller']['model'],
