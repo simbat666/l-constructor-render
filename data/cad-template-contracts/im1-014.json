@@ -87,5 +87,11 @@
       "role": "plc.outputCommon"
     }
   ],
-  "headerSource": "questionnaire"
+  "headerSource": "questionnaire",
+  "placement": {
+    "anchorHandle": "176E",
+    "anchorText": "ХТ1",
+    "x": 146.83,
+    "y": 72.52
+  }
 }

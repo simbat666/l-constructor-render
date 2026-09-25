@@ -89,5 +89,11 @@
       "text": "#DOR-NO",
       "role": "plc.do.2"
     }
-  ]
+  ],
+  "placement": {
+    "anchorHandle": "15B8",
+    "anchorText": "ХТ1",
+    "x": 146.83,
+    "y": 72.52
+  }
 }

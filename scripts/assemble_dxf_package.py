@@ -284,6 +284,21 @@ def load_selected(library_path: Path, sources_dir: Path, codes: list[str]) -> li
     return selected
 
 
+def template_placement(code, modelspace):
+    """Resolve the authored anchor instead of using unrelated source extents."""
+    path = TEMPLATE_CONTRACTS / f'{code}.json'
+    if not path.is_file():
+        return None
+    placement = json.loads(path.read_text(encoding='utf-8')).get('placement')
+    if not placement:
+        return None
+    entity = modelspace.doc.entitydb.get(placement['anchorHandle'])
+    if (entity is None or entity.dxftype() != 'MTEXT' or entity not in modelspace
+            or entity.plain_text().strip() != placement['anchorText']):
+        raise ValueError(f'Не совпала опорная надпись CAD-шаблона {code}')
+    return {'anchor': entity.dxf.insert, 'x': float(placement['x']), 'y': float(placement['y'])}
+
+
 def load_and_validate(selected: list[tuple[str, Path]], profile=None):
     prepared = []
     available_width = profile['right'] - profile['left'] if profile else RIGHT - LEFT
@@ -300,8 +315,16 @@ def load_and_validate(selected: list[tuple[str, Path]], profile=None):
             raise ValueError(f"DXF-блок {code} не содержит геометрии")
         if extents.size.x > available_width + 0.001 or extents.size.y > available_height + 0.001:
             raise ValueError(f"DXF-блок {code} не помещается в область A3")
-        if profile and (extents.extmin.y - profile['sourceOriginY'] + profile['verticalOffset'] < profile['bottom'] or extents.extmax.y - profile['sourceOriginY'] + profile['verticalOffset'] > profile['top']):
-            raise ValueError(f'Неверная вертикальная привязка {code}: нужен контракт координат шаблона')
+        if profile:
+            placement = template_placement(code, modelspace)
+            if placement:
+                dx, dy = placement['x'] - placement['anchor'].x, placement['y'] - placement['anchor'].y
+                if (extents.extmin.x + dx < profile['left'] or extents.extmax.x + dx > profile['right']
+                        or extents.extmin.y + dy < profile['bottom'] or extents.extmax.y + dy > profile['top']):
+                    raise ValueError(f'Привязка {code} выходит за рабочую область рамки')
+            elif (extents.extmin.y - profile['sourceOriginY'] + profile['verticalOffset'] < profile['bottom']
+                  or extents.extmax.y - profile['sourceOriginY'] + profile['verticalOffset'] > profile['top']):
+                raise ValueError(f'Неверная вертикальная привязка {code}: нужен контракт координат шаблона')
         prepared.append((code, document, modelspace, extents, hashlib.sha256(path.read_bytes()).hexdigest()))
     return prepared
 
@@ -310,6 +333,12 @@ def split_pages(prepared, profile=None):
     pages, current, used_width = [], [], 0.0
     available_width = profile['right'] - profile['left'] if profile else RIGHT - LEFT
     for source in prepared:
+        if profile and template_placement(source[0], source[2]):
+            if current:
+                pages.append(current)
+                current, used_width = [], 0.0
+            pages.append([source])
+            continue
         width = source[3].size.x
         gap = profile['gap'] if profile else 0
         if current and used_width + gap + width > available_width + 0.001:
@@ -370,6 +399,7 @@ def assemble(pages, output: Path, instances=None, profile=None, parameter_trace=
         for code, source_doc, source_msp, extents, source_sha256 in page:
             occurrence += 1
             instance = instances[occurrence - 1] if instances else {"tag": "", "id": str(occurrence)}
+            placement = template_placement(code, source_msp) if profile else None
             if (TEMPLATE_CONTRACTS / f'{code}.json').is_file():
                 applied_fields = apply_template_contract(code, source_msp, source_sha256, instance, designation_counters)
             else:
@@ -382,10 +412,13 @@ def assemble(pages, output: Path, instances=None, profile=None, parameter_trace=
                         'instanceId': instance['id'],
                         'sourceCode': code,
                     })
-            log = transform.inplace(
-                source_msp,
-                Matrix44.translate(cursor_x - extents.extmin.x, -profile['sourceOriginY'] + profile['verticalOffset'] if profile else TOP - extents.extmax.y, 0),
-            )
+            if placement:
+                dx = page_x + placement['x'] - placement['anchor'].x
+                dy = placement['y'] - placement['anchor'].y
+            else:
+                dx = cursor_x - extents.extmin.x
+                dy = -profile['sourceOriginY'] + profile['verticalOffset'] if profile else TOP - extents.extmax.y
+            log = transform.inplace(source_msp, Matrix44.translate(dx, dy, 0))
             if len(log):
                 raise ValueError(f"Не все сущности {code} удалось переместить: {list(log)}")
             xref.load_modelspace(source_doc, target, conflict_policy=xref.ConflictPolicy.XREF_PREFIX)

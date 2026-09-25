@@ -30,6 +30,47 @@ def im1_014_channels():
     ]
 
 class CadTests(unittest.TestCase):
+    def test_new_motor_templates_keep_the_old_sheet_anchor(self):
+        profile = json.loads(assembler.PROFILES.read_text(encoding='utf-8'))['electrical']
+        codes = ['im1-011', 'im1-012', 'im1-013', 'im1-014']
+        selected = assembler.load_selected(assembler.DEFAULT_LIBRARY, assembler.DEFAULT_DXF_SOURCES, codes)
+        prepared = assembler.load_and_validate(selected, profile)
+        pages = assembler.split_pages(prepared, profile)
+        self.assertEqual([[item[0] for item in page] for page in pages], [[code] for code in codes])
+        for index, page in enumerate(pages):
+            code, _, modelspace, _, _ = page[0]
+            placement = assembler.template_placement(code, modelspace)
+            self.assertIsNotNone(placement)
+            self.assertAlmostEqual(placement['x'], 146.83)
+            self.assertAlmostEqual(placement['y'], 72.52)
+            anchor = modelspace.doc.entitydb.get(json.loads(
+                (ROOT / 'data/cad-template-contracts' / f'{code}.json').read_text(encoding='utf-8')
+            )['placement']['anchorHandle'])
+            self.assertEqual(anchor.plain_text(), 'ХТ1')
+            with tempfile.TemporaryDirectory(prefix='l-placement-test-') as directory:
+                output = Path(directory) / 'sheet.dxf'
+                di = 'DI24-PNP' if code in {'im1-012', 'im1-014'} else 'DI24-NPN'
+                do = 'DOT-PNP' if code in {'im1-013', 'im1-014'} else 'DOR-NO'
+                channels = [dict(family=di, address='01', terminals=['01'], deviceRef='PLC', commonDesignation='GND1'),
+                            dict(family=do, address='T1' if do == 'DOT-PNP' else 'Q1-1',
+                                 terminals=['T1'] if do == 'DOT-PNP' else ['Q1-1', 'Q1-2'],
+                                 deviceRef='PLC', commonDesignation='GND3' if do == 'DOT-PNP' else None)]
+                instance = dict(id=f'm{index}', tag='M1', channels=channels,
+                                cadFieldValues={'processDeviceType': 'Насос', 'marking': 'M1', 'deviceTag': 'M1'},
+                                cadFieldSources={'processDeviceType': 'Ques 1:20', 'marking': 'Ques 1:21', 'deviceTag': 'Ques 1:22'},
+                                cadHeadRules=[dict(sourceRow=row, code=code, keyDiagram=key, placeholder=placeholder, value=value)
+                                              for row, key, placeholder, value in (
+                                                  (2, 'Imd-3', '#Process Device Type1', 'Насос'),
+                                                  (3, 'Imd-1', '#Marking2', 'M1'),
+                                                  (4, 'Imd-2', '#Device tag', 'M1'))] if code == 'im1-011' else [])
+                assembler.assemble([page], output, [instance], profile=profile)
+                document = ezdxf.readfile(output)
+                self.assertFalse(document.audit().has_errors)
+                placed = [e for e in document.modelspace().query('MTEXT') if e.plain_text().strip() == 'ХТ1']
+                self.assertEqual(len(placed), 1)
+                self.assertAlmostEqual(placed[0].dxf.insert.x, 146.83, places=2)
+                self.assertAlmostEqual(placed[0].dxf.insert.y, 72.52, places=2)
+
     def test_four_user_supplied_variants_match_sources_and_io(self):
         library = json.loads((ROOT / 'data/scheme-library.json').read_text(encoding='utf-8'))
         manifest = json.loads((ROOT / 'data/dxf-sources/conversion-manifest.json').read_text(encoding='utf-8'))

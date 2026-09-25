@@ -87,5 +87,11 @@
       "role": "plc.do.2"
     }
   ],
-  "headerSource": "questionnaire"
+  "headerSource": "questionnaire",
+  "placement": {
+    "anchorHandle": "1694",
+    "anchorText": "ХТ1",
+    "x": 146.83,
+    "y": 72.52
+  }
 }
