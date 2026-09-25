@@ -570,6 +570,7 @@ def prepare_grouped_electrical(prepared, instances):
             }))
             continue
         groups, connections = partition
+        group_extents = bbox.extents(modelspace, fast=True)
         for kind in PART_ORDER:
             part_doc = copy.deepcopy(document)
             part_model = part_doc.modelspace()
@@ -589,16 +590,27 @@ def prepare_grouped_electrical(prepared, instances):
             grouped.append((code, part_doc, part_model, part_extents, source_sha, {
                 'partKind': kind, 'instance': instance, 'fields': part_fields,
                 'sourceIndex': source_index, 'preparameterized': True,
+                # Keep the authored horizontal relationship between power,
+                # feedback and control.  They are one motor block, not three
+                # independently packed fragments.
+                'groupOriginX': group_extents.extmin.x,
+                'groupWidth': group_extents.size.x,
+                'sourceOffsetX': part_extents.extmin.x - group_extents.extmin.x,
                 'anchorSourceY': placement['anchor'].y,
                 'anchorTargetY': placement['y'], 'ports': part_ports,
             }))
-    phase_index = {kind: index for index, kind in enumerate((*PART_ORDER, 'other'))}
-    return sorted(grouped, key=lambda item: (phase_index[item[5]['partKind']], item[5]['sourceIndex']))
+    # Preserve block order.  The three parts of each motor stay adjacent and
+    # retain their source X offsets on the assembled sheet.
+    return sorted(grouped, key=lambda item: (item[5]['sourceIndex'],
+                                              PART_ORDER.index(item[5]['partKind'])
+                                              if item[5]['partKind'] in PART_ORDER else len(PART_ORDER)))
 
 
 def source_layout_width(source):
-    """Reserve room for a cross-sheet connection label."""
+    """Return the width reserved by this source or complete block."""
     meta = source[5] if len(source) > 5 else {}
+    if meta.get('groupWidth') is not None:
+        return meta['groupWidth']
     return source[3].size.x + (20 if meta.get('ports') else 0)
 
 
@@ -610,27 +622,52 @@ def source_anchored(source, profile):
     return bool(template_placement(source[0], source[2]))
 
 
+def page_group_widths(page):
+    """Return one width per layout unit, not one width per circuit part."""
+    widths = []
+    seen = set()
+    for index, source in enumerate(page):
+        meta = source[5] if len(source) > 5 else {}
+        if meta.get('groupWidth') is not None:
+            key = ('group', meta.get('sourceIndex'))
+        else:
+            key = ('item', index)
+        if key in seen:
+            continue
+        seen.add(key)
+        widths.append(source_layout_width(source))
+    return widths
+
+
 def split_pages(prepared, profile=None):
     pages, current, used_width = [], [], 0.0
     available_width = profile['right'] - profile['left'] if profile else RIGHT - LEFT
-    for source in prepared:
-        kind = source[5].get('partKind') if len(source) > 5 else None
-        previous_kind = current[0][5].get('partKind') if current and len(current[0]) > 5 else None
-        if current and kind != previous_kind:
-            pages.append(current)
-            current, used_width = [], 0.0
-        anchored = source_anchored(source, profile)
+    index = 0
+    while index < len(prepared):
+        source = prepared[index]
+        meta = source[5] if len(source) > 5 else {}
+        group_index = meta.get('sourceIndex')
+        group = [source]
+        index += 1
+        while index < len(prepared):
+            candidate = prepared[index]
+            candidate_meta = candidate[5] if len(candidate) > 5 else {}
+            if group_index is None or candidate_meta.get('sourceIndex') != group_index:
+                break
+            group.append(candidate)
+            index += 1
+        anchored = source_anchored(group[0], profile)
         if current and anchored != source_anchored(current[0], profile):
             pages.append(current)
             current, used_width = [], 0.0
-        width = source_layout_width(source)
+        width = source_layout_width(group[0])
         gap = profile['gap'] if profile else 0
         if current and used_width + gap + width > available_width + 0.001:
             pages.append(current)
             current, used_width = [], 0.0
         if current:
             used_width += gap
-        current.append(source)
+        current.extend(group)
         used_width += width
     if current:
         pages.append(current)
@@ -728,13 +765,23 @@ def assemble(pages, output: Path, instances=None, profile=None, parameter_trace=
             continue
         cursor_x = page_x + (profile['left'] if profile else LEFT)
         if profile and page and all(source_anchored(item, profile) for item in page):
-            packed_width = sum(source_layout_width(item) for item in page) + profile['gap'] * (len(page) - 1)
+            widths = page_group_widths(page)
+            packed_width = sum(widths) + profile['gap'] * max(len(widths) - 1, 0)
             cursor_x += ((profile['right'] - profile['left']) - packed_width) / 2
         visible_commons = {}
-        first_on_page = True
-        for source in page:
+        active_group = None
+        group_cursor_x = None
+        group_width = None
+        for source_index_in_page, source in enumerate(page):
             code, source_doc, source_msp, extents, source_sha256 = source[:5]
             meta = source[5] if len(source) > 5 else {}
+            grouped = meta.get('groupWidth') is not None
+            group_key = (('group', meta.get('sourceIndex')) if grouped
+                         else ('item', source_index_in_page))
+            if group_key != active_group:
+                active_group = group_key
+                group_cursor_x = cursor_x
+                group_width = meta.get('groupWidth') if grouped else None
             occurrence += 1
             instance = meta.get('instance') or (instances[occurrence - 1] if instances else {"tag": "", "id": str(occurrence)})
             placement = (template_placement(code, source_msp)
@@ -762,9 +809,10 @@ def assemble(pages, output: Path, instances=None, profile=None, parameter_trace=
             current_extents = bbox.extents(source_msp, fast=True)
             if not current_extents.has_data:
                 raise ValueError(f'{code}: после объединения общих выводов нет геометрии')
-            if shared_count and profile and not first_on_page:
-                cursor_x -= max(profile['gap'] - 2.0, 0)
-            if meta.get('anchorSourceY') is not None:
+            if grouped:
+                dx = group_cursor_x + meta['sourceOffsetX'] - current_extents.extmin.x
+                dy = meta['anchorTargetY'] - meta['anchorSourceY']
+            elif meta.get('anchorSourceY') is not None:
                 dx = cursor_x - current_extents.extmin.x
                 dy = meta['anchorTargetY'] - meta['anchorSourceY']
             elif placement:
@@ -783,11 +831,15 @@ def assemble(pages, output: Path, instances=None, profile=None, parameter_trace=
                     raise ValueError(f'{code}: нет листа для соединения {port["netId"]}')
                 x, y = port['at'][0] + dx, port['at'][1] + dy
                 net_name = f"NET-{meta['sourceIndex'] + 1}"
-                target_msp.add_circle((x, y), radius=0.6,
-                                      dxfattribs={'layer': 'L-INTERPART-REF'})
-                target_msp.add_text(f'{net_name} / Л.{peer_page}', dxfattribs={
-                    'insert': (x + 1.5, y + 1.5), 'height': 1.8,
-                    'layer': 'L-INTERPART-REF'})
+                # Parts of one motor are kept on one sheet whenever possible.
+                # A same-sheet connection is already drawn by the source wire;
+                # only a real cross-sheet connection gets a NET reference.
+                if peer_page != page_index + 1:
+                    target_msp.add_circle((x, y), radius=0.6,
+                                          dxfattribs={'layer': 'L-INTERPART-REF'})
+                    target_msp.add_text(f'{net_name} / Л.{peer_page}', dxfattribs={
+                        'insert': (x + 1.5, y + 1.5), 'height': 1.8,
+                        'layer': 'L-INTERPART-REF'})
                 if connection_trace is not None:
                     connection_trace.append({
                         'instanceId': instance['id'], 'sourceCode': code,
@@ -798,9 +850,18 @@ def assemble(pages, output: Path, instances=None, profile=None, parameter_trace=
             # An occurrence label is NOT electrical device/terminal renumbering.
             part_title = PART_TITLES.get(meta.get('partKind'))
             label = f"DRAFT {instance['tag']} / {code}" + (f" / {part_title}" if part_title else '')
-            target_msp.add_text(label, dxfattribs={"insert": (cursor_x, 278 if profile else TOP + 5), "height": 2.0})
-            cursor_x += current_extents.size.x + (20 if meta.get('ports') else 0) + (profile['gap'] if profile else 0)
-            first_on_page = False
+            label_x = (group_cursor_x + meta['sourceOffsetX']) if grouped else cursor_x
+            target_msp.add_text(label, dxfattribs={"insert": (label_x, 278 if profile else TOP + 5), "height": 2.0})
+            next_source = page[source_index_in_page + 1] if source_index_in_page + 1 < len(page) else None
+            next_meta = next_source[5] if next_source is not None and len(next_source) > 5 else {}
+            next_grouped = next_meta.get('groupWidth') is not None
+            next_key = (('group', next_meta.get('sourceIndex')) if next_grouped
+                        else ('item', source_index_in_page + 1))
+            if next_source is None or next_key != group_key:
+                if grouped:
+                    cursor_x = group_cursor_x + group_width + (profile['gap'] if profile else 0)
+                else:
+                    cursor_x += current_extents.size.x + (20 if meta.get('ports') else 0) + (profile['gap'] if profile else 0)
     extents = bbox.extents(target_msp, fast=False)
     if extents.has_data:
         # Keep the header's WCS extents consistent with the assembled model.
@@ -874,10 +935,24 @@ def build_bundle(instances, output, manifest, library=DEFAULT_LIBRARY, sources=D
             prepared = prepare_grouped_electrical(prepared, selected_instances)
         pages = split_pages(prepared, profile)
         if kind == 'electrical':
-            circuit_pages.extend({'sheetNumber': index + 1,
-                                  'part': (page[0][5]['partKind'] if len(page[0]) > 5 else 'unsplit'),
-                                  'instanceIds': [item[5]['instance']['id'] for item in page if len(item) > 5]}
-                                 for index, page in enumerate(pages))
+            for index, page in enumerate(pages):
+                parts = []
+                instance_ids = []
+                for item in page:
+                    if len(item) <= 5:
+                        continue
+                    part = item[5].get('partKind')
+                    instance_id = item[5].get('instance', {}).get('id')
+                    if part and part not in parts:
+                        parts.append(part)
+                    if instance_id and instance_id not in instance_ids:
+                        instance_ids.append(instance_id)
+                circuit_pages.append({
+                    'sheetNumber': index + 1,
+                    'part': parts[0] if len(parts) == 1 else 'grouped' if parts else 'unsplit',
+                    'parts': parts,
+                    'instanceIds': instance_ids,
+                })
         path = output.with_name(f'{output.stem}-{kind}.dxf')
         supplements = module_sheets if kind == 'electrical' else []
         assemble(pages, path, selected_instances, profile, parameter_trace, kind, supplements,
