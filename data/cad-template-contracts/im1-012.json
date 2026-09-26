@@ -223,10 +223,7 @@
       "16E4",
       "16E5",
       "16E6",
-      "16E7",
-      "16E8",
-      "16E9",
-      "16EA"
+      "16E7"
     ],
     "feedback": [
       "16B6",
@@ -242,24 +239,11 @@
       "16DE",
       "16DF",
       "16E0",
-      "16EB"
+      "16EB",
+      "16EA",
+      "16E8",
+      "16E9"
     ],
-    "interpartConnections": [
-      {
-        "netId": "feedback-control",
-        "feedback": {
-          "handle": "16EB",
-          "endpoint": "end"
-        },
-        "control": {
-          "handle": "16EA",
-          "endpoint": "end"
-        },
-        "at": [
-          4757.462328286562,
-          6037.465946656796
-        ]
-      }
-    ]
+    "interpartConnections": []
   }
 }

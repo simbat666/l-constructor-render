@@ -36,8 +36,8 @@ def template_heads(code, marking='M1'):
 
 class CadTests(unittest.TestCase):
     def test_four_motor_sources_have_exact_three_part_geometry(self):
-        expected_connections = {'im1-011': 0, 'im1-012': 1,
-                                'im1-013': 0, 'im1-014': 1}
+        expected_connections = {'im1-011': 0, 'im1-012': 0,
+                                'im1-013': 0, 'im1-014': 0}
         for code, count in expected_connections.items():
             with self.subTest(code=code):
                 path = ROOT / 'data/cad-template-contracts' / f'{code}.json'
@@ -59,7 +59,22 @@ class CadTests(unittest.TestCase):
                     with self.assertRaisesRegex(ValueError, 'не все межчастные соединения'):
                         assembler.validate_circuit_parts(code, model, changed)
 
-    def test_bundle_groups_circuits_and_keeps_interpart_connection(self):
+    def test_pnp_feedback_owns_complete_supply_branch(self):
+        for code, wire, return_wire, dot in [
+            ('im1-012', '16EA', '16EB', ['16E8', '16E9']),
+            ('im1-014', '17B6', '17B7', ['17B4', '17B5']),
+        ]:
+            with self.subTest(code=code):
+                contract = json.loads((ROOT / 'data/cad-template-contracts' / f'{code}.json').read_text())
+                parts = contract['circuitParts']
+                for handle in [wire, return_wire, *dot]:
+                    self.assertIn(handle, parts['feedback'])
+                    self.assertNotIn(handle, parts['control'])
+                doc = ezdxf.readfile(ROOT / 'data/dxf-sources' / f'{code}.dxf')
+                self.assertTrue(doc.entitydb[wire].dxf.end.isclose(doc.entitydb[return_wire].dxf.end))
+                self.assertEqual(parts['interpartConnections'], [])
+
+    def test_bundle_groups_circuits_and_keeps_supply_in_feedback(self):
         variants = [
             ('im1-011', [
                 dict(family='DI24-NPN', address='07', terminals=['07'], deviceRef='PLC', commonDesignation='GND1'),
@@ -97,15 +112,12 @@ class CadTests(unittest.TestCase):
             self.assertEqual(assignments['m2', 'device.km.main']['after'], 'KM2')
             self.assertEqual(assignments['m2', 'device.km.contact']['after'], 'KM2.1')
             ports = manifest['cadInterpartConnections']
-            self.assertEqual(len(ports), 2)
-            self.assertEqual({port['part'] for port in ports}, {'control', 'feedback'})
-            self.assertEqual({port['netId'] for port in ports}, {'NET-2'})
-            self.assertEqual({(port['page'], port['peerPage']) for port in ports}, {(2, 3), (3, 2)})
+            self.assertEqual(ports, [])
             document = ezdxf.readfile(root / 'result-electrical.dxf')
             self.assertFalse(document.audit().has_errors)
             links = [entity.dxf.text for entity in document.modelspace().query('TEXT')
                      if entity.dxf.layer == 'L-INTERPART-REF']
-            self.assertEqual(set(links), {'NET-2 / Л.2', 'NET-2 / Л.3'})
+            self.assertEqual(links, [])
 
     def test_grouped_scheme_uses_selected_universal_pin_and_gnd(self):
         code = 'im1-014'
@@ -155,7 +167,7 @@ class CadTests(unittest.TestCase):
         self.assertEqual(len(grouped), 12)
         self.assertEqual([item[5]['partKind'] for item in grouped],
                          ['power'] * 4 + ['control'] * 4 + ['feedback'] * 4)
-        self.assertEqual(sum(len(item[5]['ports']) for item in grouped), 4)
+        self.assertEqual(sum(len(item[5]['ports']) for item in grouped), 0)
         pages = assembler.split_pages(grouped, profile)
         self.assertEqual([len(page) for page in pages], [4, 4, 4])
         for page in pages:
@@ -169,7 +181,7 @@ class CadTests(unittest.TestCase):
                                'electrical', connection_trace=connections)
             self.assertFalse(ezdxf.readfile(output).audit().has_errors)
             self.assertEqual(len(trace), 52)
-            self.assertEqual({item['netId'] for item in connections}, {'NET-2', 'NET-4'})
+            self.assertEqual(connections, [])
 
     def test_each_circuit_kind_gets_its_own_sheet(self):
         code = 'im1-014'
@@ -187,9 +199,9 @@ class CadTests(unittest.TestCase):
             assembler.assemble(pages, output, [instance], profile, connection_trace=connections)
             drawing = ezdxf.readfile(output)
             self.assertFalse(drawing.audit().has_errors)
-            self.assertEqual({(port['page'], port['peerPage']) for port in connections}, {(2, 3), (3, 2)})
+            self.assertEqual(connections, [])
             self.assertEqual(len([entity for entity in drawing.modelspace().query('TEXT')
-                                  if entity.dxf.layer == 'L-INTERPART-REF']), 2)
+                                  if entity.dxf.layer == 'L-INTERPART-REF']), 0)
 
     def test_repeated_motor_sheets_pack_and_keep_one_common_label(self):
         profile = json.loads(assembler.PROFILES.read_text(encoding='utf-8'))['electrical']

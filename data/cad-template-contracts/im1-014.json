@@ -217,9 +217,6 @@
       "17B0"
     ],
     "control": [
-      "17B4",
-      "17B5",
-      "17B6",
       "17B8",
       "17B9",
       "17BA",
@@ -249,24 +246,11 @@
       "17B1",
       "17B2",
       "17B3",
-      "17B7"
+      "17B7",
+      "17B6",
+      "17B4",
+      "17B5"
     ],
-    "interpartConnections": [
-      {
-        "netId": "feedback-control",
-        "feedback": {
-          "handle": "17B7",
-          "endpoint": "end"
-        },
-        "control": {
-          "handle": "17B6",
-          "endpoint": "end"
-        },
-        "at": [
-          4888.547281787136,
-          6050.801566641728
-        ]
-      }
-    ]
+    "interpartConnections": []
   }
 }
