@@ -199,6 +199,11 @@ class CadTests(unittest.TestCase):
             assembler.assemble(pages, output, [instance], profile, connection_trace=connections)
             drawing = ezdxf.readfile(output)
             self.assertFalse(drawing.audit().has_errors)
+            labels = [e for e in drawing.modelspace().query('TEXT')
+                      if e.dxf.text.startswith('DRAFT ')]
+            self.assertEqual(len(labels), 3)
+            for index, label in enumerate(labels):
+                self.assertAlmostEqual(label.dxf.insert.x, index * (assembler.PAGE_WIDTH + assembler.PAGE_GAP) + profile['left'])
             self.assertEqual(connections, [])
             self.assertEqual(len([entity for entity in drawing.modelspace().query('TEXT')
                                   if entity.dxf.layer == 'L-INTERPART-REF']), 0)
@@ -282,7 +287,7 @@ class CadTests(unittest.TestCase):
                 self.assertFalse(document.audit().has_errors)
                 placed = [e for e in document.modelspace().query('MTEXT') if e.plain_text().strip() == 'ХТ1']
                 self.assertEqual(len(placed), 1)
-                expected_x = profile['left'] + ((profile['right'] - profile['left']) - page[0][3].size.x) / 2
+                expected_x = profile['left']
                 self.assertAlmostEqual(placed[0].dxf.insert.x, expected_x, places=2)
                 self.assertAlmostEqual(placed[0].dxf.insert.y, 60.37893761952546, places=2)
 

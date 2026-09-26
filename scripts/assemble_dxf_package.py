@@ -759,10 +759,6 @@ def assemble(pages, output: Path, instances=None, profile=None, parameter_trace=
             add_module_schedule(target_msp, page_x, module, instances or [])
             continue
         cursor_x = page_x + (profile['left'] if profile else LEFT)
-        if profile and page and all(source_anchored(item, profile) for item in page):
-            widths = page_group_widths(page)
-            packed_width = sum(widths) + profile['gap'] * max(len(widths) - 1, 0)
-            cursor_x += ((profile['right'] - profile['left']) - packed_width) / 2
         visible_commons = {}
         active_group = None
         group_cursor_x = None
