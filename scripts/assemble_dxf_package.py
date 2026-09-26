@@ -570,7 +570,6 @@ def prepare_grouped_electrical(prepared, instances):
             }))
             continue
         groups, connections = partition
-        group_extents = bbox.extents(modelspace, fast=True)
         for kind in PART_ORDER:
             part_doc = copy.deepcopy(document)
             part_model = part_doc.modelspace()
@@ -590,20 +589,13 @@ def prepare_grouped_electrical(prepared, instances):
             grouped.append((code, part_doc, part_model, part_extents, source_sha, {
                 'partKind': kind, 'instance': instance, 'fields': part_fields,
                 'sourceIndex': source_index, 'preparameterized': True,
-                # Keep the authored horizontal relationship between power,
-                # feedback and control.  They are one motor block, not three
-                # independently packed fragments.
-                'groupOriginX': group_extents.extmin.x,
-                'groupWidth': group_extents.size.x,
-                'sourceOffsetX': part_extents.extmin.x - group_extents.extmin.x,
                 'anchorSourceY': placement['anchor'].y,
                 'anchorTargetY': placement['y'], 'ports': part_ports,
             }))
-    # Preserve block order.  The three parts of each motor stay adjacent and
-    # retain their source X offsets on the assembled sheet.
-    return sorted(grouped, key=lambda item: (item[5]['sourceIndex'],
-                                              PART_ORDER.index(item[5]['partKind'])
-                                              if item[5]['partKind'] in PART_ORDER else len(PART_ORDER)))
+    # Pack one circuit kind at a time; keep cabinet block order within each kind.
+    return sorted(grouped, key=lambda item: (PART_ORDER.index(item[5]['partKind'])
+                                              if item[5]['partKind'] in PART_ORDER else len(PART_ORDER),
+                                              item[5]['sourceIndex']))
 
 
 def source_layout_width(source):
@@ -611,7 +603,8 @@ def source_layout_width(source):
     meta = source[5] if len(source) > 5 else {}
     if meta.get('groupWidth') is not None:
         return meta['groupWidth']
-    return source[3].size.x + (20 if meta.get('ports') else 0)
+    width = source[3].size.x + (20 if meta.get('ports') else 0)
+    return max(width, 65) if meta.get('partKind') in PART_ORDER else width
 
 
 def source_anchored(source, profile):
@@ -646,7 +639,7 @@ def split_pages(prepared, profile=None):
     while index < len(prepared):
         source = prepared[index]
         meta = source[5] if len(source) > 5 else {}
-        group_index = meta.get('sourceIndex')
+        group_index = meta.get('sourceIndex') if meta.get('groupWidth') is not None else None
         group = [source]
         index += 1
         while index < len(prepared):
@@ -657,7 +650,9 @@ def split_pages(prepared, profile=None):
             group.append(candidate)
             index += 1
         anchored = source_anchored(group[0], profile)
-        if current and anchored != source_anchored(current[0], profile):
+        current_meta = current[0][5] if current and len(current[0]) > 5 else {}
+        if current and (anchored != source_anchored(current[0], profile)
+                        or meta.get('partKind') != current_meta.get('partKind')):
             pages.append(current)
             current, used_width = [], 0.0
         width = source_layout_width(group[0])

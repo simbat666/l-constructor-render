@@ -76,9 +76,9 @@ class CadTests(unittest.TestCase):
             source_manifest.write_text(json.dumps({'instances': instances}), encoding='utf-8')
             assembler.build_bundle(instances, root / 'result.zip', source_manifest)
             manifest = json.loads((root / 'result-manifest.json').read_text(encoding='utf-8'))
-            self.assertEqual([page['part'] for page in manifest['cadCircuitPages']], ['grouped'])
+            self.assertEqual([page['part'] for page in manifest['cadCircuitPages']], ['power', 'control', 'feedback'])
             self.assertEqual(manifest['cadCircuitPages'][0]['parts'],
-                             ['power', 'control', 'feedback'])
+                             ['power'])
             self.assertEqual(manifest['cadCircuitPages'][0]['instanceIds'], ['m1', 'm2'])
             fields = manifest['cadParameterization']['fields']
             self.assertEqual(len(fields), 26)
@@ -100,12 +100,12 @@ class CadTests(unittest.TestCase):
             self.assertEqual(len(ports), 2)
             self.assertEqual({port['part'] for port in ports}, {'control', 'feedback'})
             self.assertEqual({port['netId'] for port in ports}, {'NET-2'})
-            self.assertEqual({(port['page'], port['peerPage']) for port in ports}, {(1, 1)})
+            self.assertEqual({(port['page'], port['peerPage']) for port in ports}, {(2, 3), (3, 2)})
             document = ezdxf.readfile(root / 'result-electrical.dxf')
             self.assertFalse(document.audit().has_errors)
             links = [entity.dxf.text for entity in document.modelspace().query('TEXT')
                      if entity.dxf.layer == 'L-INTERPART-REF']
-            self.assertEqual(links, [])
+            self.assertEqual(set(links), {'NET-2 / Л.2', 'NET-2 / Л.3'})
 
     def test_grouped_scheme_uses_selected_universal_pin_and_gnd(self):
         code = 'im1-014'
@@ -124,11 +124,11 @@ class CadTests(unittest.TestCase):
             marked = {field['fieldId']: field for field in manifest['cadParameterization']['fields']}
             self.assertEqual((marked['plc.di']['after'], marked['plc.common']['after']), ('U1', 'GND3'))
             self.assertEqual((marked['plc.do.1']['after'], marked['plc.do.common']['after']), ('U7', 'GND3'))
-            self.assertEqual((marked['plc.common']['sheetNumber'], marked['plc.do.common']['sheetNumber']), (1, 1))
+            self.assertEqual((marked['plc.common']['sheetNumber'], marked['plc.do.common']['sheetNumber']), (3, 2))
             drawing = ezdxf.readfile(root / 'result-electrical.dxf')
             self.assertFalse(drawing.audit().has_errors)
             texts = [entity.plain_text().strip() for entity in drawing.modelspace().query('MTEXT')]
-            self.assertEqual(texts.count('GND3'), 1)
+            self.assertEqual(texts.count('GND3'), 2)
             self.assertNotIn('GND1', texts)
 
     def test_all_four_variants_prepare_in_block_order(self):
@@ -154,16 +154,13 @@ class CadTests(unittest.TestCase):
             assembler.load_and_validate(selected, profile), instances)
         self.assertEqual(len(grouped), 12)
         self.assertEqual([item[5]['partKind'] for item in grouped],
-                         ['power', 'control', 'feedback'] * 4)
+                         ['power'] * 4 + ['control'] * 4 + ['feedback'] * 4)
         self.assertEqual(sum(len(item[5]['ports']) for item in grouped), 4)
         pages = assembler.split_pages(grouped, profile)
-        self.assertEqual([len(page) for page in pages], [9, 3])
+        self.assertEqual([len(page) for page in pages], [4, 4, 4])
         for page in pages:
-            for offset in range(0, len(page), 3):
-                block = page[offset:offset + 3]
-                self.assertEqual(len({item[5]['sourceIndex'] for item in block}), 1)
-                self.assertEqual({item[5]['partKind'] for item in block},
-                                 {'power', 'control', 'feedback'})
+            self.assertEqual(len({item[5]['partKind'] for item in page}), 1)
+            self.assertEqual([item[5]['sourceIndex'] for item in page], [0, 1, 2, 3])
         with tempfile.TemporaryDirectory(prefix='l-four-circuits-') as directory:
             output = Path(directory) / 'four.dxf'
             trace = []
@@ -174,33 +171,25 @@ class CadTests(unittest.TestCase):
             self.assertEqual(len(trace), 52)
             self.assertEqual({item['netId'] for item in connections}, {'NET-2', 'NET-4'})
 
-    def test_grouped_parts_keep_authored_horizontal_offsets(self):
+    def test_each_circuit_kind_gets_its_own_sheet(self):
         code = 'im1-014'
         instance = dict(id='m1', tag='M1', code=code, drawingKind='electrical',
                         channels=im1_014_channels(), cadHeadRules=template_heads(code))
         profile = json.loads(assembler.PROFILES.read_text(encoding='utf-8'))['electrical']
         selected = assembler.load_selected(assembler.DEFAULT_LIBRARY, assembler.DEFAULT_DXF_SOURCES, [code])
-        prepared = assembler.prepare_grouped_electrical(
-            assembler.load_and_validate(selected, profile), [instance])
+        prepared = assembler.prepare_grouped_electrical(assembler.load_and_validate(selected, profile), [instance])
         pages = assembler.split_pages(prepared, profile)
-        self.assertEqual(len(pages), 1)
-        self.assertEqual([item[5]['partKind'] for item in pages[0]],
-                         ['power', 'control', 'feedback'])
-        offsets = {item[5]['partKind']: item[5]['sourceOffsetX'] for item in pages[0]}
-        self.assertEqual(offsets['power'], 0)
-        self.assertLess(offsets['feedback'], offsets['control'])
+        self.assertEqual([[item[5]['partKind'] for item in page] for page in pages],
+                         [['power'], ['control'], ['feedback']])
         with tempfile.TemporaryDirectory(prefix='l-part-layout-') as directory:
             output = Path(directory) / 'layout.dxf'
-            assembler.assemble(pages, output, [instance], profile)
+            connections = []
+            assembler.assemble(pages, output, [instance], profile, connection_trace=connections)
             drawing = ezdxf.readfile(output)
-            labels = {}
-            for entity in drawing.modelspace().query('TEXT'):
-                text = entity.dxf.text
-                for kind, title in assembler.PART_TITLES.items():
-                    if f' / {title}' in text:
-                        labels[kind] = entity.dxf.insert.x
-            self.assertLess(labels['power'], labels['feedback'])
-            self.assertLess(labels['feedback'], labels['control'])
+            self.assertFalse(drawing.audit().has_errors)
+            self.assertEqual({(port['page'], port['peerPage']) for port in connections}, {(2, 3), (3, 2)})
+            self.assertEqual(len([entity for entity in drawing.modelspace().query('TEXT')
+                                  if entity.dxf.layer == 'L-INTERPART-REF']), 2)
 
     def test_repeated_motor_sheets_pack_and_keep_one_common_label(self):
         profile = json.loads(assembler.PROFILES.read_text(encoding='utf-8'))['electrical']
