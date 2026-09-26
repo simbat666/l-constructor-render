@@ -232,6 +232,20 @@ class CadTests(unittest.TestCase):
             self.assertAlmostEqual(anchors[1].y, anchors[2].y)
             self.assertTrue(anchors[0].x < anchors[1].x < anchors[2].x)
 
+    def test_motor_power_points_match_frame_buses(self):
+        profile = json.loads(assembler.PROFILES.read_text(encoding='utf-8'))['electrical']
+        frame = ezdxf.readfile(ROOT / 'data/dxf-frames' / profile['frame'])
+        l1_y = frame.entitydb['12B0'].dxf.start.y - profile['origin'][1]
+        dc_y = frame.entitydb['12B3'].dxf.start.y - profile['origin'][1]
+        for code, l1_handle, dc_handle in [('im1-011', '15D5', None), ('im1-012', '16B1', '16E9'),
+                                          ('im1-013', '15D5', None), ('im1-014', '178B', '17B5')]:
+            document = ezdxf.readfile(assembler.DEFAULT_DXF_SOURCES / f'{code}.dxf')
+            placement = assembler.template_placement(code, document.modelspace())
+            dy = placement['y'] - placement['anchor'].y
+            self.assertAlmostEqual(document.entitydb[l1_handle].dxf.center.y + dy, l1_y, places=5)
+            if dc_handle:
+                self.assertAlmostEqual(document.entitydb[dc_handle].dxf.center.y + dy, dc_y, places=5)
+
     def test_new_motor_templates_keep_the_old_sheet_anchor(self):
         profile = json.loads(assembler.PROFILES.read_text(encoding='utf-8'))['electrical']
         codes = ['im1-011', 'im1-012', 'im1-013', 'im1-014']
@@ -244,7 +258,7 @@ class CadTests(unittest.TestCase):
             placement = assembler.template_placement(code, modelspace)
             self.assertIsNotNone(placement)
             self.assertAlmostEqual(placement['x'], 146.83)
-            self.assertAlmostEqual(placement['y'], 72.52)
+            self.assertAlmostEqual(placement['y'], 60.37893761952546)
             anchor = modelspace.doc.entitydb.get(json.loads(
                 (ROOT / 'data/cad-template-contracts' / f'{code}.json').read_text(encoding='utf-8')
             )['placement']['anchorHandle'])
@@ -269,7 +283,7 @@ class CadTests(unittest.TestCase):
                 self.assertEqual(len(placed), 1)
                 expected_x = profile['left'] + ((profile['right'] - profile['left']) - page[0][3].size.x) / 2
                 self.assertAlmostEqual(placed[0].dxf.insert.x, expected_x, places=2)
-                self.assertAlmostEqual(placed[0].dxf.insert.y, 72.52, places=2)
+                self.assertAlmostEqual(placed[0].dxf.insert.y, 60.37893761952546, places=2)
 
     def test_four_user_supplied_variants_match_sources_and_io(self):
         library = json.loads((ROOT / 'data/scheme-library.json').read_text(encoding='utf-8'))
