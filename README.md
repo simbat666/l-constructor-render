@@ -95,7 +95,7 @@ npm run rules:sync -- --source "/полный/путь/Новая ОЛ.xlsx" --t
 
 - `scripts/questionnaire.py` — граф и проверка ответов ОЛ.
 - `scripts/cabinet_engine.py` — подбор, спецификация и объяснение результата.
-- `scripts/io_allocator.py` — подбор минимального числа модулей и распределение по
+- `scripts/io_allocator.py` — распределение по вручную добавленным модулям и
   отдельным выводам M245/M1…M5 без повторного занятия физического ресурса.
 - `scripts/local_cad_api.py` — API расчёта и экспорта; экспорт всегда пересчитывается на сервере.
 - `app/`, `components/`, `lib/engineering-client.ts` — интерфейс и связь с Python.

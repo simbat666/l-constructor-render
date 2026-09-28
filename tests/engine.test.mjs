@@ -78,12 +78,12 @@ test('workspace draft restores valid blocks separately for each account', () => 
       id: 'motor-one', tag: 'М1', cell: 5,
       state: { selected: { start: 'direct' }, inputs: { power: '5.5' }, checks: {}, uploads: {} },
     }],
-    activeMotorId: 'motor-one', sheetOpen: true,
+    moduleCount: 2, activeMotorId: 'motor-one', sheetOpen: true,
   };
   assert.deepEqual(decodeProject(encodeProject(project)), project);
   assert.equal(projectStorageKey('Engineer-1'), 'l-constructor:project:v1:engineer-1');
   assert.equal(projectStorageKey('engineer-2'), 'l-constructor:project:v1:engineer-2');
-  assert.deepEqual(decodeProject('{"version":1,"motors":[{"id":"same","tag":"M1","cell":0,"state":{"selected":{},"inputs":{},"checks":{},"uploads":{}}},{"id":"same","tag":"M2","cell":1,"state":{"selected":{},"inputs":{},"checks":{},"uploads":{}}}]}'), { motors: [], activeMotorId: null, sheetOpen: false });
+  assert.deepEqual(decodeProject('{"version":1,"motors":[{"id":"same","tag":"M1","cell":0,"state":{"selected":{},"inputs":{},"checks":{},"uploads":{}}},{"id":"same","tag":"M2","cell":1,"state":{"selected":{},"inputs":{},"checks":{},"uploads":{}}}]}'), { motors: [], moduleCount: 0, activeMotorId: null, sheetOpen: false });
 });
 
 test('local account catalog separates projects and their workspaces', () => {

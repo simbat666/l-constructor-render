@@ -246,28 +246,31 @@ function CabinetApp({ user, project, workspace, onBack, onLogout }: { user: stri
   const [savedProject] = useState(() => loadLocalWorkspace(user, project.id, workspace.id));
   const [motors, setMotors] = useState<MotorBlock[]>(() => savedProject.motors.map((motor: StoredMotor) => ({ ...motor, requested: false, generation: { status: 'idle' } })));
   const [activeMotorId, setActiveMotorId] = useState<string | null>(savedProject.activeMotorId);
+  const [moduleCount, setModuleCount] = useState(savedProject.moduleCount);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [cabinetGeneration, setCabinetGeneration] = useState<Generation>({
     status: 'idle',
   });
-  const engineering = useEngineering(motors, (normalized) => {
+  const engineering = useEngineering(motors, moduleCount, (normalized) => {
     setMotors(current => current.map(motor => {
       const accepted = normalized.find(item => item.id === motor.id);
       return accepted ? {...motor, state: accepted.state} : motor;
     }));
   });
   const {cabinet, revision: questionnaireRevision} = engineering;
-  const inputVersion = JSON.stringify(
-    motors.map(({ id, tag, state, mainSchemeCode }) => ({ id, tag, state, ...(mainSchemeCode ? { mainSchemeCode } : {}) })),
-  );
+  const inputVersion = JSON.stringify({
+    motors: motors.map(({ id, tag, state, mainSchemeCode }) => ({ id, tag, state, ...(mainSchemeCode ? { mainSchemeCode } : {}) })),
+    moduleCount,
+  });
   useEffect(() => {
     saveLocalWorkspace(user, project.id, workspace.id, {
       motors: motors.map(({ id, tag, cell, state, mainSchemeCode }) => ({ id, tag, cell, state, ...(mainSchemeCode ? { mainSchemeCode } : {}) })),
+      moduleCount,
       activeMotorId,
       sheetOpen,
     });
-  }, [user, project.id, workspace.id, motors, activeMotorId, sheetOpen]);
+  }, [user, project.id, workspace.id, motors, moduleCount, activeMotorId, sheetOpen]);
   const latestVersion = useRef(inputVersion);
   latestVersion.current = inputVersion;
   useEffect(() => {
@@ -387,7 +390,7 @@ function CabinetApp({ user, project, workspace, onBack, onLogout }: { user: stri
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          motors: JSON.parse(inputVersion),
+          ...JSON.parse(inputVersion),
           blockId: activeMotorId,
           ruleFingerprint: cabinet.ruleFingerprint,
         }),
@@ -446,7 +449,7 @@ function CabinetApp({ user, project, workspace, onBack, onLogout }: { user: stri
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          motors: JSON.parse(inputVersion),
+          ...JSON.parse(inputVersion),
           ruleFingerprint: cabinet.ruleFingerprint,
         }),
       });
@@ -630,12 +633,25 @@ function CabinetApp({ user, project, workspace, onBack, onLogout }: { user: stri
               </div>
             )}
             <div className="mt-5 rounded-2xl bg-[#f4f4f8] p-4 text-xs leading-5 text-[#777786]">
-              I/O распределяются по ZENTEC M245 и, при нехватке выводов, до пяти
-              тестовых модулей M245 no display для всего шкафа. Клеммы XT и связи
-              GND/COM в DXF пока не назначаются.
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="font-semibold text-[#403b55]">Модули расширения</p>
+                  <p>ZENTEC M245 no display · добавлены вручную</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button type="button" aria-label="Убрать модуль расширения" disabled={moduleCount === 0}
+                    onClick={() => setModuleCount(value => Math.max(0, value - 1))}
+                    className="rounded-lg bg-white px-3 py-1 text-base font-semibold text-[#6254ca] disabled:opacity-40">−</button>
+                  <span aria-live="polite" className="min-w-5 text-center text-sm font-semibold text-[#403b55]">{moduleCount}</span>
+                  <button type="button" aria-label="Добавить модуль расширения" disabled={moduleCount === 5}
+                    onClick={() => setModuleCount(value => Math.min(5, value + 1))}
+                    className="rounded-lg bg-white px-3 py-1 text-base font-semibold text-[#6254ca] disabled:opacity-40">+</button>
+                </div>
+              </div>
+              <p className="mt-2">Выводы распределяются только по контроллеру и добавленным модулям. Максимум 5 модулей.</p>
               {cabinet.plcHardware.length > 0 && (
                 <p className="mt-2 font-semibold text-[#403b55]">
-                  Подобрано: {cabinet.plcHardware.map((device) => `${device.ref} — ${device.brand} ${device.model}`).join('; ')}.
+                  Состав: {cabinet.plcHardware.map((device) => `${device.ref} — ${device.brand} ${device.model}`).join('; ')}.
                 </p>
               )}
             </div>
@@ -675,14 +691,9 @@ function CabinetApp({ user, project, workspace, onBack, onLogout }: { user: stri
                 </p>
               )}
               {cabinet.errors.length > 0 && (
-                <p className="text-xs leading-5 text-[#9a5635]">
-                  Нужно заполнить или исправить блоки:{' '}
-                  {cabinet.blocks
-                    .filter((block) => block.errors.length)
-                    .map((block) => block.tag)
-                    .join(', ') || cabinet.errors[0]}
-                  . Открой опросник.
-                </p>
+                <ul role="alert" className="space-y-1 text-xs leading-5 text-[#9a5635]">
+                  {cabinet.errors.map((message, index) => <li key={`${index}:${message}`}>{message}</li>)}
+                </ul>
               )}
               <Button
                 variant="outline"

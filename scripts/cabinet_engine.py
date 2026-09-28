@@ -4,7 +4,7 @@ import hashlib
 import re
 from questionnaire import (BASE, BINDINGS, active_answers, diagram_rows, optional_rows,
                            selections, semantic_key, norm, number, fmt, prune_state, visible_groups)
-from io_allocator import CATALOG, allocate_io
+from io_allocator import CATALOG, MAX_MODULES, allocate_io, module_entries
 
 RULE_FINGERPRINT = hashlib.sha256('|'.join((
     BASE['source']['sha256'],
@@ -36,7 +36,7 @@ def amperes(value):
 def spec(row, source):
     return dict(name=row['name'], quantity=row['quantity'], unit=row['unit'], source=source)
 
-def calculate_cabinet(motors):
+def calculate_cabinet(motors, module_count=0):
     demands, blocks = [], []
     for motor in motors:
         selection = diagram_rows(motor['state'])
@@ -85,7 +85,7 @@ def calculate_cabinet(motors):
                         f"Для модели {', '.join(f'{brand} {model}' for brand, model in sorted(common))} нет проверенного каталога выводов." if common and supported not in common else None)
     plans = [dict(controller=f'{brand.upper()} {model.upper()}', **allocate_io([
         dict(d, candidates=[r for r in d['candidates'] if (norm(r.get('controller')), norm(r.get('controllerType'))) == (brand, model)])
-        for d in ready])) for brand, model in sorted(common) if (brand, model) == supported]
+        for d in ready], module_count)) for brand, model in sorted(common) if (brand, model) == supported]
     valid_plans = [p for p in plans if not p.get('error')]
     plan = min(valid_plans, key=lambda p: (len(p.get('modules', [])), sum(bool(v) for v in p.get('totals', {}).values()))) if valid_plans else None
     errors = [f"{b['tag']}: {e}" for b in blocks for e in b['errors']]
@@ -196,18 +196,18 @@ def calculate_cabinet(motors):
         for item in block['specification']:
             outputs.append(dict(id=f"spec:{item['source']}:{item['name']}", title=item['name'], detail=f"{fmt(item['quantity'])} {item['unit']}", source=item['source']))
         block['decisionTrace'] = dict(inputs=inputs, rules=rules, outputs=outputs)
-    modules = plan['modules'] if plan else []
+    modules = module_entries(module_count)
     return dict(schemaVersion=1, ruleFingerprint=RULE_FINGERPRINT, status='draft', blocks=blocks, instances=instances, errors=errors, warnings=[
         'DXF — черновая компоновка шаблонов, не выпущенная КД. Для im1-011…014 маркируются выводы ПЛК, ХТ1, QF/KM и заголовки; номиналы и электрические соединения ещё не параметризованы.',
         'Выводы ПЛК и тестовых модулей распределены по таблице ключей. Физическое объединение GND/COM и связи с внешней схемой ещё не рассчитаны.',
         *(['Номера клемм M245 no display в тестовом листе составлены по образцу M245; нужна сверка с паспортом модуля.'] if modules else []),
-        *(['Для назначенных выводов модулей добавляется отдельный лист с обозначением модуля. Его геометрия и клеммы в DXF пока не параметризованы.'] if modules else []),
+        *(['При экспорте назначенных выводов модулей добавляется отдельный лист с обозначением модуля. Его геометрия и клеммы в DXF пока не параметризованы.'] if modules else []),
     ], controllerFamily=plan['controller'] if plan else None,
        modules=modules,
        plcHardware=([dict(ref='PLC', brand=CATALOG['controller']['brand'], model=CATALOG['controller']['model'],
                           quantity=1, source='base_controller:2')] +
                     [dict(ref=module['ref'], brand=module['brand'], model=module['model'],
-                          quantity=1, source=module['source']) for module in modules]) if plan else [],
+                          quantity=1, source=module['source']) for module in modules]),
        io=plan['totals'] if plan else {}, canExport=bool(motors) and not errors and bool(instances))
 
 class RevisionConflict(ValueError):
@@ -252,7 +252,10 @@ def validate_project(payload):
 
 def evaluate_project(payload):
     motors = validate_project(payload)
-    calculation = calculate_cabinet(motors)
+    module_count = payload.get("moduleCount", 0)
+    if isinstance(module_count, bool) or not isinstance(module_count, int) or not 0 <= module_count <= MAX_MODULES:
+        raise ValueError(f"Число модулей расширения должно быть от 0 до {MAX_MODULES}.")
+    calculation = calculate_cabinet(motors, module_count)
     # Only active question descriptions leave the server; never the rule tables/binds.
     forms = {}
     for motor in motors:

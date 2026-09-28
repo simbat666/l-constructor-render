@@ -98,7 +98,7 @@ class FrozenEngineFixturesTests(unittest.TestCase):
             motor['id'] = f'motor-{index + 1}'
             motor['tag'] = f'M{index + 1}'
             motors.append(motor)
-        calculation = calculate_cabinet(motors)
+        calculation = calculate_cabinet(motors, module_count=1)
         self.assertEqual(calculation['errors'], [])
         self.assertTrue(calculation['canExport'])
         self.assertTrue(any('отдельный лист' in warning for warning in calculation['warnings']))
@@ -107,6 +107,26 @@ class FrozenEngineFixturesTests(unittest.TestCase):
         channels = [channel for block in calculation['blocks'] for channel in block['channels']]
         self.assertEqual(len(channels), 32)
         self.assertEqual(len({(item['deviceRef'], item['address']) for item in channels}), 32)
+
+    def test_manual_module_count_controls_capacity_and_hardware(self):
+        source = next(case for case in FIXTURES['cases'] if case['id'] == 'direct-motor')['motors'][0]
+        motors = []
+        for index in range(16):
+            motor = copy.deepcopy(source)
+            motor['id'] = f'motor-{index + 1}'
+            motor['tag'] = f'M{index + 1}'
+            motors.append(motor)
+        missing = calculate_cabinet(motors, module_count=0)
+        self.assertFalse(missing['canExport'])
+        self.assertTrue(any('Добавь модуль расширения' in error for error in missing['errors']))
+        installed = calculate_cabinet(motors, module_count=1)
+        self.assertTrue(installed['canExport'])
+        self.assertEqual([module['ref'] for module in installed['modules']], ['M1'])
+        removed = calculate_cabinet(motors, module_count=0)
+        self.assertFalse(removed['canExport'])
+        spare = calculate_cabinet([copy.deepcopy(source)], module_count=2)
+        self.assertEqual([module['ref'] for module in spare['modules']], ['M1', 'M2'])
+        self.assertEqual([part['ref'] for part in spare['plcHardware']], ['PLC', 'M1', 'M2'])
 
     def test_cad_names_follow_active_ol_answers(self):
         self.assertEqual([(row['keyDiagram'], row['sourceRow']) for row in BASE['diagramHeads']],

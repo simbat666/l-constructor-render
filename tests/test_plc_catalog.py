@@ -31,9 +31,9 @@ class PlcCatalogTests(unittest.TestCase):
         self.assertEqual({first['commonKey'], second['commonKey']}, {'#GND1'})
         self.assertNotEqual(first['address'], second['address'])
 
-    def test_shared_group_capacity_selects_one_module(self):
+    def test_shared_group_capacity_uses_installed_module(self):
         # Six base RTD pins occupy group 3; the seventh NPN needs the module.
-        result = allocate_io([demand('rtd', {'AI-RTD2': 6}), demand('npn', {'DI24-NPN': 7})])
+        result = allocate_io([demand('rtd', {'AI-RTD2': 6}), demand('npn', {'DI24-NPN': 7})], module_count=1)
         self.assertNotIn('error', result)
         self.assertEqual(len(result['modules']), 1)
         channels = [channel for block in result['allocations'] for channel in block['channels']]
@@ -61,7 +61,7 @@ class PlcCatalogTests(unittest.TestCase):
         self.assertTrue(any(address.startswith('U') for address in addresses))
 
     def test_module_address_is_local_to_each_device(self):
-        result = allocate_io([demand('relay', {'DOR-NO': 6})])
+        result = allocate_io([demand('relay', {'DOR-NO': 6})], module_count=1)
         self.assertEqual(len(result['modules']), 1)
         channels = result['allocations'][0]['channels']
         self.assertEqual(channels[0]['address'], channels[5]['address'])
@@ -69,13 +69,13 @@ class PlcCatalogTests(unittest.TestCase):
         self.assertEqual(channels[5]['source'], 'Клеммы модуля тест:41')
 
     def test_common_designation_is_scoped_to_device(self):
-        result = allocate_io([demand('inputs', {'DI24-PNP': 13})])
+        result = allocate_io([demand('inputs', {'DI24-PNP': 13})], module_count=1)
         channels = result['allocations'][0]['channels']
         self.assertIn('PLC:GND1', {c['commonRef'] for c in channels})
         self.assertIn('M1:GND1', {c['commonRef'] for c in channels})
 
-    def test_two_modules_are_selected_only_when_one_cannot_fit(self):
-        result = allocate_io([demand('mixed', {'DI24-HSC-NPN': 7, 'DI24-NPN': 13})])
+    def test_two_installed_modules_handle_shared_capacity(self):
+        result = allocate_io([demand('mixed', {'DI24-HSC-NPN': 7, 'DI24-NPN': 13})], module_count=2)
         self.assertEqual(len(result['modules']), 2)
         channels = result['allocations'][0]['channels']
         self.assertEqual(len({(c['deviceRef'], c['address']) for c in channels}), len(channels))
@@ -89,8 +89,8 @@ class PlcCatalogTests(unittest.TestCase):
         self.assertEqual(result['modules'], [])
 
     def test_five_module_limit_is_enforced(self):
-        self.assertEqual(len(allocate_io([demand('relays', {'DOR-NO': 30})])['modules']), 5)
-        result = allocate_io([demand('relays', {'DOR-NO': 31})])
+        self.assertEqual(len(allocate_io([demand('relays', {'DOR-NO': 30})], module_count=5)['modules']), 5)
+        result = allocate_io([demand('relays', {'DOR-NO': 31})], module_count=5)
         self.assertIn('Недостаточно', result['error'])
 
 

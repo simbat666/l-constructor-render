@@ -49,12 +49,15 @@ export function numericInputRule(rule: string | null) {
   return { min, max, step };
 }
 
-export function projectVersion(motors: ProjectMotor[]) {
-  return JSON.stringify(motors.map(({id, tag, state, mainSchemeCode}) => ({id, tag, state, ...(mainSchemeCode ? {mainSchemeCode} : {})})));
+export function projectVersion(motors: ProjectMotor[], moduleCount = 0) {
+  return JSON.stringify({
+    motors: motors.map(({id, tag, state, mainSchemeCode}) => ({id, tag, state, ...(mainSchemeCode ? {mainSchemeCode} : {})})),
+    moduleCount,
+  });
 }
 
-export function useEngineering(motors: ProjectMotor[], accept: (motors: ProjectMotor[]) => void) {
-  const version = projectVersion(motors);
+export function useEngineering(motors: ProjectMotor[], moduleCount: number, accept: (motors: ProjectMotor[]) => void) {
+  const version = projectVersion(motors, moduleCount);
   const latest = useRef(version);
   latest.current = version;
   const acceptRef = useRef(accept);
@@ -70,13 +73,13 @@ export function useEngineering(motors: ProjectMotor[], accept: (motors: ProjectM
       try {
         const result = await fetch('/api/cad/calculate', {
           method: 'POST', headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({motors: JSON.parse(version)}), signal: controller.signal,
+          body: version, signal: controller.signal,
         });
         const data = await result.json();
         if (!result.ok) throw new Error(data.error || 'Ошибка расчёта');
         if (controller.signal.aborted || latest.current !== version) return;
         const normalized = data.calculation.blocks as ProjectMotor[];
-        const acceptedVersion = projectVersion(normalized);
+        const acceptedVersion = projectVersion(normalized, moduleCount);
         setResponse({...data, version: acceptedVersion});
         acceptRef.current(normalized);
       } catch (reason) {

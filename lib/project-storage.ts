@@ -8,7 +8,7 @@ const MAX_NAME_LENGTH = 80;
 export type StoredMotor = { id: string; tag: string; cell: number; state: QuestionnaireState; mainSchemeCode?: string };
 
 /** The field saved inside one workspace. It contains neither passwords nor CAD files. */
-export type StoredProject = { motors: StoredMotor[]; activeMotorId: string | null; sheetOpen: boolean };
+export type StoredProject = { motors: StoredMotor[]; moduleCount: number; activeMotorId: string | null; sheetOpen: boolean };
 
 export type LocalWorkspace = { id: string; name: string; createdAt: string; updatedAt: string };
 
@@ -22,7 +22,7 @@ export type LocalProject = {
 
 export type LocalProjectCatalog = { projects: LocalProject[] };
 
-const emptyProject = (): StoredProject => ({ motors: [], activeMotorId: null, sheetOpen: false });
+const emptyProject = (): StoredProject => ({ motors: [], moduleCount: 0, activeMotorId: null, sheetOpen: false });
 const emptyCatalog = (): LocalProjectCatalog => ({ projects: [] });
 
 function accountName(user: string | null) {
@@ -126,7 +126,9 @@ export function decodeProject(raw: string | null): StoredProject {
     const cells = new Set(validMotors.map((item) => item.cell));
     if (ids.size !== validMotors.length || cells.size !== validMotors.length) return emptyProject();
     const activeMotorId = typeof parsed.activeMotorId === 'string' && ids.has(parsed.activeMotorId) ? parsed.activeMotorId : null;
-    return { motors: validMotors, activeMotorId, sheetOpen: Boolean(parsed.sheetOpen) && Boolean(activeMotorId) };
+    const moduleCount = parsed.moduleCount === undefined ? 0 : parsed.moduleCount;
+    if (typeof moduleCount !== 'number' || !Number.isInteger(moduleCount) || moduleCount < 0 || moduleCount > 5) return emptyProject();
+    return { motors: validMotors, moduleCount, activeMotorId, sheetOpen: Boolean(parsed.sheetOpen) && Boolean(activeMotorId) };
   } catch { return emptyProject(); }
 }
 

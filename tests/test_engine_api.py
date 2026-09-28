@@ -36,6 +36,15 @@ def complete():
     return dict(id='one', tag='M1', state=state)
 
 class EngineApiTests(unittest.TestCase):
+    def test_module_count_is_validated_on_server(self):
+        for value in [-1, 6, True, 1.5, '1']:
+            with self.subTest(value=value), self.assertRaisesRegex(ValueError, 'Число модулей'):
+                evaluate_project({'motors': [], 'moduleCount': value})
+        result = evaluate_project({'motors': [], 'moduleCount': 5})
+        self.assertEqual(result['calculation']['errors'], [])
+        self.assertEqual([module['ref'] for module in result['calculation']['modules']],
+                         ['M1', 'M2', 'M3', 'M4', 'M5'])
+
     def test_main_scheme_choice_is_validated_and_preserved(self):
         motor = complete()
         motor['mainSchemeCode'] = 'im1-011'
@@ -90,6 +99,20 @@ class EngineApiTests(unittest.TestCase):
         self.assertEqual(self.post('/generate', {'motors': [complete()], 'ruleFingerprint': 'old'})[0], 409)
         self.assertEqual(self.post('/generate', {'instances': [{'id': 'fake', 'code': 'im1-011'}], 'ruleFingerprint': RULE_FINGERPRINT})[0], 422)
         self.assertEqual(self.post('/generate', {'motors': [dict(id='one', tag='M1', state=initial_state())], 'ruleFingerprint': RULE_FINGERPRINT})[0], 422)
+
+    def test_insufficient_manually_selected_modules_block_export(self):
+        motors = [dict(copy.deepcopy(complete()), id=f'motor-{index}', tag=f'M{index}')
+                  for index in range(16)]
+        payload = {'motors': motors, 'moduleCount': 0}
+        status, result = self.post('/calculate', payload)
+        self.assertEqual(status, 200)
+        self.assertFalse(result['calculation']['canExport'])
+        self.assertTrue(any('Добавь модуль расширения' in error for error in result['calculation']['errors']))
+        status, result = self.post('/generate', {**payload, 'ruleFingerprint': RULE_FINGERPRINT})
+        self.assertEqual(status, 422, result)
+        status, result = self.post('/calculate', {**payload, 'moduleCount': 1})
+        self.assertEqual(status, 200)
+        self.assertTrue(result['calculation']['canExport'])
 
     def test_hidden_answers_are_removed_and_result_recomputed(self):
         motor = complete()

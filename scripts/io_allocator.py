@@ -48,6 +48,12 @@ def demands_for(counts):
     return [code for code, count in zip(CODES, counts) for _ in range(count)]
 
 
+def module_entries(module_count):
+    return [dict(ref=f'M{index}', brand=CATALOG['module']['brand'], model=CATALOG['module']['model'],
+                 source='moduls:2', terminalStatus=CATALOG['module']['terminalStatus'])
+            for index in range(1, module_count + 1)]
+
+
 def within_capacity(counts, module_count):
     """Necessary capacity bounds before exact pin matching."""
     return (sum(counts) <= BASE_AMOUNT + module_count * MODULE_AMOUNT and
@@ -78,10 +84,6 @@ def feasible_match(counts, module_count):
         return False
 
     return all(visit(index, set()) for index in order)
-
-
-def min_modules(counts):
-    return next((amount for amount in range(MAX_MODULES + 1) if feasible_match(counts, amount)), None)
 
 
 def pin_match(counts, module_count=0):
@@ -147,10 +149,12 @@ def pin_match(counts, module_count=0):
     return chosen if len(chosen) == n and all(chosen.values()) else None
 
 
-def allocate_io(blocks):
-    """Choose OL variants, then the fewest modules and a global pin placement."""
+def allocate_io(blocks, module_count=0):
+    """Choose OL variants and assign pins on the user's installed PLC hardware."""
+    if isinstance(module_count, bool) or not isinstance(module_count, int) or not 0 <= module_count <= MAX_MODULES:
+        raise ValueError(f'Число модулей расширения должно быть от 0 до {MAX_MODULES}.')
     if not blocks:
-        return dict(allocations=[], totals={code: 0 for code in CODES}, modules=[])
+        return dict(allocations=[], totals={code: 0 for code in CODES}, modules=module_entries(module_count))
     states = {tuple(0 for _ in CODES): ([], 0, ())}
     for block in blocks:
         if not block['candidates']:
@@ -163,9 +167,7 @@ def allocate_io(blocks):
                        for code, value in io.items()):
                     return dict(allocations=[], error=f"Некорректный I/O: {block['id']}, строка {candidate['sourceRow']}.")
                 updated = tuple(count + io.get(code, 0) for code, count in zip(CODES, counts))
-                # Final states get exact matching. Demand counts can only grow,
-                # so a state beyond these bounds can never become feasible.
-                if not within_capacity(updated, MAX_MODULES):
+                if not within_capacity(updated, module_count):
                     continue
                 next_penalty = penalty + io.get('DI24-NPN', 0) * 2 + io.get('DI24-HSC-NPN', 0) * 2 + io.get('DOR-NO', 0)
                 path = (selected + [candidate], next_penalty, rows + (candidate['sourceRow'],))
@@ -173,13 +175,17 @@ def allocate_io(blocks):
                     next_states[updated] = path
         states = next_states
         if not states:
-            return dict(allocations=[], error=f"Недостаточно совместимых выводов {CATALOG['controller']['brand']} {CATALOG['controller']['model']} и {MAX_MODULES} модулей для {block['id']}.")
-    feasible = [(counts, path, module_count) for counts, path in states.items()
-                if (module_count := min_modules(counts)) is not None]
-    if not feasible:
-        return dict(allocations=[], error='Недостаточно совместимых выводов ПЛК для выбранных схем.')
-    counts, (selected, _, _), module_count = min(feasible, key=lambda item: (
-        item[2], sum(item[0]), item[1][1], item[1][2]))
+            return dict(allocations=[], error=(
+                f"Недостаточно совместимых выводов для {block['id']} при {module_count} "
+                f"модулях расширения. Добавь модуль расширения или уменьши число сигналов."))
+    feasible_states = [(counts, path) for counts, path in states.items()
+                       if feasible_match(counts, module_count)]
+    if not feasible_states:
+        return dict(allocations=[], error=(
+            f"Недостаточно совместимых выводов при {module_count} модулях расширения. "
+            "Добавь модуль расширения или уменьши число сигналов."))
+    counts, (selected, _, _) = min(feasible_states, key=lambda item: (
+        sum(item[0]), item[1][1], item[1][2]))
     matched = pin_match(counts, module_count)
     if matched is None:
         return dict(allocations=[], error='Не удалось назначить совместимые выводы ПЛК.')
@@ -200,7 +206,5 @@ def allocate_io(blocks):
                                                 if option.get('commonDesignation') else None),
                                      source=f"{option['sourceSheet']}:{option['sourceRow']}"))
         allocations.append(dict(id=block['id'], scheme=scheme, channels=channels))
-    modules = [dict(ref=f'M{index}', brand=CATALOG['module']['brand'], model=CATALOG['module']['model'],
-                    source='moduls:2', terminalStatus=CATALOG['module']['terminalStatus'])
-               for index in range(1, module_count + 1)]
+    modules = module_entries(module_count)
     return dict(allocations=allocations, totals=dict(zip(CODES, counts)), modules=modules)
