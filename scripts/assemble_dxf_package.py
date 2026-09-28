@@ -604,7 +604,7 @@ def source_layout_width(source):
     if meta.get('groupWidth') is not None:
         return meta['groupWidth']
     width = source[3].size.x + (20 if meta.get('ports') else 0)
-    return max(width, 65) if meta.get('partKind') in PART_ORDER else width
+    return width
 
 
 def source_anchored(source, profile):
@@ -840,7 +840,8 @@ def assemble(pages, output: Path, instances=None, profile=None, parameter_trace=
                     })
             # An occurrence label is NOT electrical device/terminal renumbering.
             part_title = PART_TITLES.get(meta.get('partKind'))
-            label = f"DRAFT {instance['tag']} / {code}" + (f" / {part_title}" if part_title else '')
+            label = (f"DRAFT {instance['tag']}" if part_title
+                     else f"DRAFT {instance['tag']} / {code}")
             label_x = (group_cursor_x + meta['sourceOffsetX']) if grouped else cursor_x
             target_msp.add_text(label, dxfattribs={"insert": (label_x, 278 if profile else TOP + 5), "height": 2.0})
             next_source = page[source_index_in_page + 1] if source_index_in_page + 1 < len(page) else None

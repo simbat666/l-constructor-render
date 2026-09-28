@@ -183,6 +183,29 @@ class CadTests(unittest.TestCase):
             self.assertEqual(len(trace), 52)
             self.assertEqual(connections, [])
 
+    def test_grouped_sheets_fill_available_width_before_continuing(self):
+        code = 'im1-014'
+        profile = json.loads(assembler.PROFILES.read_text(encoding='utf-8'))['electrical']
+        instances = [dict(id=f'm{i}', tag=f'M{i}', code=code, drawingKind='electrical',
+                          channels=im1_014_channels(), cadHeadRules=template_heads(code, f'M{i}'))
+                     for i in range(12)]
+        selected = assembler.load_selected(assembler.DEFAULT_LIBRARY,
+                                           assembler.DEFAULT_DXF_SOURCES, [code] * len(instances))
+        grouped = assembler.prepare_grouped_electrical(
+            assembler.load_and_validate(selected, profile), instances)
+        pages = assembler.split_pages(grouped, profile)
+        self.assertEqual([len(page) for page in pages], [10, 2, 12, 8, 4])
+        self.assertEqual([page[0][5]['partKind'] for page in pages],
+                         ['power', 'power', 'control', 'feedback', 'feedback'])
+        available = profile['right'] - profile['left']
+        for index, page in enumerate(pages):
+            widths = [assembler.source_layout_width(item) for item in page]
+            used = sum(widths) + profile['gap'] * (len(page) - 1)
+            self.assertLessEqual(used, available + 0.001)
+            if index + 1 < len(pages) and pages[index + 1][0][5]['partKind'] == page[0][5]['partKind']:
+                next_width = assembler.source_layout_width(pages[index + 1][0])
+                self.assertGreater(used + profile['gap'] + next_width, available)
+
     def test_each_circuit_kind_gets_its_own_sheet(self):
         code = 'im1-014'
         instance = dict(id='m1', tag='M1', code=code, drawingKind='electrical',
