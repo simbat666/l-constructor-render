@@ -51,6 +51,27 @@ def concise(calculation, expected):
 
 
 class FrozenEngineFixturesTests(unittest.TestCase):
+    def test_explicit_choice_reaches_each_replacement_template(self):
+        source = next(case for case in FIXTURES['cases'] if case['id'] == 'direct-motor')['motors'][0]
+        for code, di_family, do_family in (
+            ('im1-011', 'DI24-NPN', 'DOR-NO'),
+            ('im1-012', 'DI24-PNP', 'DOR-NO'),
+            ('im1-013', 'DI24-NPN', 'DOT-PNP'),
+            ('im1-014', 'DI24-PNP', 'DOT-PNP'),
+        ):
+            with self.subTest(code=code):
+                motor = copy.deepcopy(source)
+                motor['mainSchemeCode'] = code
+                result = calculate_cabinet([motor])
+                self.assertEqual(result['errors'], [])
+                self.assertEqual(result['blocks'][0]['main']['diagram1'], code)
+                self.assertEqual((result['io'][di_family], result['io'][do_family]), (1, 1))
+                self.assertEqual(len(result['blocks'][0]['mainChoices']), 4)
+        motor['mainSchemeCode'] = 'im1-999'
+        invalid = calculate_cabinet([motor])
+        self.assertFalse(invalid['canExport'])
+        self.assertTrue(any('im1-999' in error for error in invalid['errors']))
+
     def test_engine_cases(self):
         self.assertEqual(FIXTURES['format'], 1)
         for case in FIXTURES['cases']:
@@ -68,6 +89,8 @@ class FrozenEngineFixturesTests(unittest.TestCase):
             motors.append(motor)
         calculation = calculate_cabinet(motors)
         self.assertEqual(calculation['errors'], [])
+        self.assertTrue(calculation['canExport'])
+        self.assertTrue(any('отдельный лист' in warning for warning in calculation['warnings']))
         self.assertEqual([item['ref'] for item in calculation['modules']], ['M1'])
         self.assertEqual([item['ref'] for item in calculation['plcHardware']], ['PLC', 'M1'])
         channels = [channel for block in calculation['blocks'] for channel in block['channels']]
@@ -80,9 +103,11 @@ class FrozenEngineFixturesTests(unittest.TestCase):
         case = next(case for case in FIXTURES['cases'] if case['id'] == 'direct-motor')
         result = calculate_cabinet(copy.deepcopy(case['motors']))
         self.assertTrue(result['instances'])
-        # The source OL has no diagram-head mapping for im1-014; direct-motor
-        # still must carry no invented header fields.
+        # The source OL has no diagram-head row for im1-014. Its supplied DWG
+        # carries the same keys, so values trace directly to active Ques 1 rows.
         self.assertEqual(result['instances'][0]['cadHeadRules'], [])
+        self.assertEqual(result['instances'][0]['cadFieldValues']['marking'], 'M1')
+        self.assertTrue(result['instances'][0]['cadFieldSources']['marking'].startswith('Ques 1:'))
 
         row = next(row for row in BASE['diagrams1'] if row['diagram1'] == 'im1-011')
         with patch.object(cabinet_engine, 'diagram_rows', return_value={'rows': [row], 'missing': []}):
@@ -119,6 +144,20 @@ class FrozenEngineFixturesTests(unittest.TestCase):
         cleaned = prune_state(state)
         self.assertFalse(any(key.startswith('Ques 2:') for key in cleaned['inputs']))
         self.assertFalse(any(key.startswith('Ques 2:') for key in cleaned['selected']))
+
+    def test_questionnaire_cache_tracks_changes_and_keeps_forms_independent(self):
+        source = next(case for case in FIXTURES['cases'] if case['id'] == 'direct-motor-with-sensors')
+        state = copy.deepcopy(source['motors'][0]['state'])
+        expected = visible_groups(state)
+        self.assertTrue(any(group['sheet'] == 'Ques 2' for group in expected))
+        changed_form = visible_groups(state)
+        changed_form[0]['question'] = 'изменено клиентом'
+        changed_form[0]['nodes'][0]['answer'] = 'изменено клиентом'
+        self.assertEqual(visible_groups(state), expected)
+        state['checks']['Ques 1:14.1'] = False
+        self.assertFalse(any(group['sheet'] == 'Ques 2' for group in visible_groups(state)))
+        state['checks']['Ques 1:14.1'] = True
+        self.assertEqual(visible_groups(state), expected)
 
     def test_pt100_rtd_rows_use_one_two_three_inputs(self):
         for source_rows in ((5, 6, 7), (8, 9, 10)):

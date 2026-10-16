@@ -159,21 +159,25 @@ def apply_template_contract(code, modelspace, source_sha256, instance, counters)
             raise ValueError(f'Поле {code}:{field["handle"]} не совпало с проверенным шаблоном')
         entities[field['handle']] = entity
 
+    input_family = contract.get('inputFamily')
+    output_family = contract.get('outputFamily')
+    if input_family not in ('DI24-NPN', 'DI24-PNP') or output_family not in ('DOR-NO', 'DOT-PNP'):
+        raise ValueError(f'{code}: не задан проверенный тип входа и выхода')
     channels = instance.get('channels', [])
-    di = [item for item in channels if item.get('family') == 'DI24-NPN']
-    do = [item for item in channels if item.get('family') == 'DOR-NO']
-    if len(di) != 1 or len(do) != 1 or len(do[0].get('terminals', [])) != 2:
-        raise ValueError(f'{code}: требуется ровно один DI24-NPN и один DOR-NO с двумя выводами')
-    if di[0].get('deviceRef', 'PLC') != 'PLC' or do[0].get('deviceRef', 'PLC') != 'PLC':
-        raise ValueError(f'{code}: нет проверенной маркировки вывода модуля на CAD-шаблоне')
-    if (di[0].get('commonKey') != '#GND1' or di[0].get('commonDesignation') != 'GND1'
-            or not di[0].get('address')):
-        raise ValueError(f'{code}: не подтверждена группа GND1 и клемма DI24-NPN')
+    di = [item for item in channels if item.get('family') == input_family]
+    do = [item for item in channels if item.get('family') == output_family]
+    expected_output_terminals = 2 if output_family == 'DOR-NO' else 1
+    if len(di) != 1 or len(do) != 1 or len(do[0].get('terminals', [])) != expected_output_terminals:
+        raise ValueError(f'{code}: требуется один {input_family} и один {output_family}')
+    if not di[0].get('commonDesignation') or not di[0].get('address'):
+        raise ValueError(f'{code}: не подтверждены общий вывод и клемма {input_family}')
+    if output_family == 'DOT-PNP' and not do[0].get('commonDesignation'):
+        raise ValueError(f'{code}: не подтверждён общий вывод {output_family}')
     head_rules = instance.get('cadHeadRules')
-    if not isinstance(head_rules, list) or len(head_rules) != 3:
+    if not isinstance(head_rules, list) or (contract.get('requireDiagramHead') and len(head_rules) != 3):
         raise ValueError(f'{code}: нет трёх правил diagram head из ОЛ')
     head_by_key = {rule.get('keyDiagram'): rule for rule in head_rules}
-    if len(head_by_key) != 3:
+    if len(head_by_key) != len(head_rules):
         raise ValueError(f'{code}: повтор ключа diagram head')
 
     # The source has one QF and one KM. Contacts share their device numbers.
@@ -189,17 +193,38 @@ def apply_template_contract(code, modelspace, source_sha256, instance, counters)
         'device.qf.contact': f"QF{numbers['QF']}.1",
         'device.km.main': f"KM{numbers['KM']}",
         'device.km.contact': f"KM{numbers['KM']}.1",
-        'plc.common': di[0]['commonDesignation'],
+        'plc.inputCommon': di[0]['commonDesignation'],
         'plc.di': str(di[0]['address']),
         'plc.do.1': str(do[0]['terminals'][0]),
-        'plc.do.2': str(do[0]['terminals'][1]),
     }
+    if output_family == 'DOR-NO':
+        values['plc.do.2'] = str(do[0]['terminals'][1])
+    else:
+        values['plc.outputCommon'] = do[0]['commonDesignation']
+    module_fields = {}
+    if di[0].get('deviceRef', 'PLC') != 'PLC':
+        module_fields.update({'plc.inputCommon': di[0]['deviceRef'], 'plc.di': di[0]['deviceRef']})
+    if do[0].get('deviceRef', 'PLC') != 'PLC':
+        module_fields.update({role: do[0]['deviceRef'] for role in
+                              (('plc.do.1', 'plc.do.2') if output_family == 'DOR-NO'
+                               else ('plc.do.1', 'plc.outputCommon'))})
     for field in fields:
         key = field.get('diagramKey')
         if not key:
             continue
         rule = head_by_key.get(key)
-        if not rule or rule.get('code') != code or rule.get('placeholder') != field.get('sourcePlaceholder', field['text']):
+        if not rule:
+            if contract.get('requireDiagramHead'):
+                raise ValueError(f'{code}: ключ {key} отсутствует в diagram head ОЛ')
+            if contract.get('headerSource') == 'questionnaire':
+                header_name = {'Imd-3': 'processDeviceType', 'Imd-1': 'marking', 'Imd-2': 'deviceTag'}[key]
+                value = (instance.get('cadFieldValues') or {}).get(header_name)
+                if value is not None:
+                    if not isinstance(value, str) or not value.strip() or len(value) > 100 or any(ord(c) < 32 for c in value):
+                        raise ValueError(f'{code}: некорректное значение {key} из опросника')
+                    values[field['role']] = value.strip()
+            continue
+        if rule.get('code') != code or rule.get('placeholder') != field.get('sourcePlaceholder', field['text']):
             raise ValueError(f'{code}: ключ {key} в diagram head не соответствует проверенному полю DXF')
         value = rule.get('value')
         if value is not None:
@@ -209,8 +234,9 @@ def apply_template_contract(code, modelspace, source_sha256, instance, counters)
     trace = []
     for field in fields:
         before = field['text']
-        after = values.get(field['role'], before)
-        unresolved = field['role'].startswith('header.') and field['role'] not in values
+        module_ref = module_fields.get(field['role'])
+        after = before if module_ref else values.get(field['role'], before)
+        unresolved = bool(module_ref) or (field['role'].startswith('header.') and field['role'] not in values)
         if not unresolved and field['role'] not in values:
             raise ValueError(f'{code}: неизвестная роль поля {field["role"]}')
         entity = entities[field['handle']]
@@ -225,7 +251,12 @@ def apply_template_contract(code, modelspace, source_sha256, instance, counters)
             'placeholderHandle': field['handle'],
             'offsetY': field.get('offsetY', 0),
             'status': 'unresolved' if unresolved else 'applied',
-            'ruleSource': f"diagram head:{head_by_key[field['diagramKey']]['sourceRow']}" if field.get('diagramKey') else None,
+            'assignedModule': module_ref,
+            'ruleSource': (f"diagram head:{head_by_key[field['diagramKey']]['sourceRow']}"
+                           if field.get('diagramKey') in head_by_key else
+                           (instance.get('cadFieldSources') or {}).get(
+                               {'Imd-3': 'processDeviceType', 'Imd-1': 'marking', 'Imd-2': 'deviceTag'}[field['diagramKey']])
+                           if field.get('diagramKey') and contract.get('headerSource') == 'questionnaire' else None),
         })
     return trace
 
@@ -260,6 +291,21 @@ def load_selected(library_path: Path, sources_dir: Path, codes: list[str]) -> li
     return selected
 
 
+def template_placement(code, modelspace):
+    """Resolve the authored anchor instead of using unrelated source extents."""
+    path = TEMPLATE_CONTRACTS / f'{code}.json'
+    if not path.is_file():
+        return None
+    placement = json.loads(path.read_text(encoding='utf-8')).get('placement')
+    if not placement:
+        return None
+    entity = modelspace.doc.entitydb.get(placement['anchorHandle'])
+    if (entity is None or entity.dxftype() != 'MTEXT' or entity not in modelspace
+            or entity.plain_text().strip() != placement['anchorText']):
+        raise ValueError(f'Не совпала опорная надпись CAD-шаблона {code}')
+    return {'anchor': entity.dxf.insert, 'x': float(placement['x']), 'y': float(placement['y'])}
+
+
 def load_and_validate(selected: list[tuple[str, Path]], profile=None):
     prepared = []
     available_width = profile['right'] - profile['left'] if profile else RIGHT - LEFT
@@ -276,8 +322,16 @@ def load_and_validate(selected: list[tuple[str, Path]], profile=None):
             raise ValueError(f"DXF-блок {code} не содержит геометрии")
         if extents.size.x > available_width + 0.001 or extents.size.y > available_height + 0.001:
             raise ValueError(f"DXF-блок {code} не помещается в область A3")
-        if profile and (extents.extmin.y - profile['sourceOriginY'] + profile['verticalOffset'] < profile['bottom'] or extents.extmax.y - profile['sourceOriginY'] + profile['verticalOffset'] > profile['top']):
-            raise ValueError(f'Неверная вертикальная привязка {code}: нужен контракт координат шаблона')
+        if profile:
+            placement = template_placement(code, modelspace)
+            if placement:
+                dx, dy = placement['x'] - placement['anchor'].x, placement['y'] - placement['anchor'].y
+                if (extents.extmin.x + dx < profile['left'] or extents.extmax.x + dx > profile['right']
+                        or extents.extmin.y + dy < profile['bottom'] or extents.extmax.y + dy > profile['top']):
+                    raise ValueError(f'Привязка {code} выходит за рабочую область рамки')
+            elif (extents.extmin.y - profile['sourceOriginY'] + profile['verticalOffset'] < profile['bottom']
+                  or extents.extmax.y - profile['sourceOriginY'] + profile['verticalOffset'] > profile['top']):
+                raise ValueError(f'Неверная вертикальная привязка {code}: нужен контракт координат шаблона')
         prepared.append((code, document, modelspace, extents, hashlib.sha256(path.read_bytes()).hexdigest()))
     return prepared
 
@@ -286,6 +340,12 @@ def split_pages(prepared, profile=None):
     pages, current, used_width = [], [], 0.0
     available_width = profile['right'] - profile['left'] if profile else RIGHT - LEFT
     for source in prepared:
+        if profile and template_placement(source[0], source[2]):
+            if current:
+                pages.append(current)
+                current, used_width = [], 0.0
+            pages.append([source])
+            continue
         width = source[3].size.x
         gap = profile['gap'] if profile else 0
         if current and used_width + gap + width > available_width + 0.001:
@@ -331,21 +391,36 @@ def add_frame(target, profile, page_index, page_count, page_x):
     target.modelspace().add_text(profile['title'] + ' / DRAFT', dxfattribs={'insert': (page_x + 40, 290), 'height': 2.0})
 
 
-def assemble(pages, output: Path, instances=None, profile=None, parameter_trace=None, drawing_kind=None) -> None:
+def assemble(pages, output: Path, instances=None, profile=None, parameter_trace=None, drawing_kind=None,
+             module_sheets=None) -> None:
     target = ezdxf.new("R2018", setup=True)
     target.header["$INSUNITS"] = 4  # millimetres; source library uses mm
     target_msp = target.modelspace()
     occurrence = 0
     designation_counters = {}
     field_contract = load_field_contract()
-    for page_index, page in enumerate(pages):
+    module_sheets = module_sheets or []
+    if module_sheets and (not profile or drawing_kind != 'electrical'):
+        raise ValueError('Листы модулей допустимы только в принципиальном комплекте с рамкой')
+    all_pages = pages + [[] for _ in module_sheets]
+    for page_index, page in enumerate(all_pages):
         page_x = page_index * (PAGE_WIDTH + PAGE_GAP)
         if profile:
-            add_frame(target, profile, page_index, len(pages), page_x)
+            add_frame(target, profile, page_index, len(all_pages), page_x)
+        if page_index >= len(pages):
+            module = module_sheets[page_index - len(pages)]
+            target_msp.add_text(
+                f"ДОП. МОДУЛЬ {module['ref']} / {module['brand']} {module['model']} / DRAFT",
+                dxfattribs={'insert': (page_x + 40, 278), 'height': 2.0})
+            target_msp.add_text(
+                'Геометрия и клеммы модуля не заданы в CAD-шаблоне.',
+                dxfattribs={'insert': (page_x + 40, 268), 'height': 2.0})
+            continue
         cursor_x = page_x + (profile['left'] if profile else LEFT)
         for code, source_doc, source_msp, extents, source_sha256 in page:
             occurrence += 1
             instance = instances[occurrence - 1] if instances else {"tag": "", "id": str(occurrence)}
+            placement = template_placement(code, source_msp) if profile else None
             if (TEMPLATE_CONTRACTS / f'{code}.json').is_file():
                 applied_fields = apply_template_contract(code, source_msp, source_sha256, instance, designation_counters)
             else:
@@ -358,10 +433,13 @@ def assemble(pages, output: Path, instances=None, profile=None, parameter_trace=
                         'instanceId': instance['id'],
                         'sourceCode': code,
                     })
-            log = transform.inplace(
-                source_msp,
-                Matrix44.translate(cursor_x - extents.extmin.x, -profile['sourceOriginY'] + profile['verticalOffset'] if profile else TOP - extents.extmax.y, 0),
-            )
+            if placement:
+                dx = page_x + placement['x'] - placement['anchor'].x
+                dy = placement['y'] - placement['anchor'].y
+            else:
+                dx = cursor_x - extents.extmin.x
+                dy = -profile['sourceOriginY'] + profile['verticalOffset'] if profile else TOP - extents.extmax.y
+            log = transform.inplace(source_msp, Matrix44.translate(dx, dy, 0))
             if len(log):
                 raise ValueError(f"Не все сущности {code} удалось переместить: {list(log)}")
             xref.load_modelspace(source_doc, target, conflict_policy=xref.ConflictPolicy.XREF_PREFIX)
@@ -413,6 +491,17 @@ def main() -> None:
 
 def build_bundle(instances, output, manifest, library=DEFAULT_LIBRARY, sources=DEFAULT_DXF_SOURCES):
     profiles = json.loads(PROFILES.read_text(encoding='utf-8'))
+    manifest_payload = json.loads(manifest.read_text(encoding='utf-8'))
+    hardware = {item['ref']: item for item in manifest_payload.get('plcHardware', [])
+                if isinstance(item, dict) and isinstance(item.get('ref'), str)}
+    module_refs = {channel.get('deviceRef') for instance in instances for channel in instance.get('channels', [])
+                   if isinstance(channel, dict) and channel.get('deviceRef') not in (None, 'PLC')}
+    if any(not isinstance(ref, str) or not re.fullmatch(r'M[1-9]\d{0,2}', ref) for ref in module_refs):
+        raise ValueError('Некорректное обозначение модуля для дополнительного листа')
+    module_sheets = [dict(ref=ref,
+                          brand=str(hardware.get(ref, {}).get('brand') or 'ZENTEC'),
+                          model=str(hardware.get(ref, {}).get('model') or 'M245 no display'))
+                     for ref in sorted(module_refs, key=lambda item: int(item[1:]))]
     if any(item.get('drawingKind') not in profiles for item in instances):
         raise ValueError('Не задан вид документа для экземпляра')
     files = []
@@ -424,11 +513,12 @@ def build_bundle(instances, output, manifest, library=DEFAULT_LIBRARY, sources=D
         selected = load_selected(library, sources, [item['code'] for item in selected_instances])
         pages = split_pages(load_and_validate(selected, profile), profile)
         path = output.with_name(f'{output.stem}-{kind}.dxf')
-        assemble(pages, path, selected_instances, profile, parameter_trace, kind)
+        supplements = module_sheets if kind == 'electrical' else []
+        assemble(pages, path, selected_instances, profile, parameter_trace, kind, supplements)
         files.append(path)
-        print(f"{profile['title']}: {len(selected_instances)} фрагментов, {len(pages)} листов; рамка {profile['frame']}", flush=True)
+        print(f"{profile['title']}: {len(selected_instances)} фрагментов, {len(pages) + len(supplements)} листов; рамка {profile['frame']}", flush=True)
     package_manifest = output.with_name(f'{output.stem}-manifest.json')
-    manifest_payload = json.loads(manifest.read_text(encoding='utf-8'))
+    manifest_payload['cadModuleSheets'] = module_sheets
     manifest_payload['cadParameterization'] = {
         'contractVersion': load_field_contract()['schemaVersion'],
         'fields': parameter_trace,

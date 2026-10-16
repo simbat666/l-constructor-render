@@ -16,8 +16,8 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
 import local_cad_api as api
-from cabinet_engine import evaluate_project, validate_project, RevisionConflict, RULE_FINGERPRINT
-from questionnaire import initial_state, visible_groups, numeric_rule, prune_state
+from cabinet_engine import evaluate_project, validate_project, RULE_FINGERPRINT
+from questionnaire import initial_state, visible_groups, numeric_rule
 
 def complete():
     state = initial_state()
@@ -36,6 +36,17 @@ def complete():
     return dict(id='one', tag='M1', state=state)
 
 class EngineApiTests(unittest.TestCase):
+    def test_main_scheme_choice_is_validated_and_preserved(self):
+        motor = complete()
+        motor['mainSchemeCode'] = 'im1-011'
+        normalized = validate_project({'motors': [motor]})
+        self.assertEqual(normalized[0]['mainSchemeCode'], 'im1-011')
+        motor['mainSchemeCode'] = 'im1-999'
+        self.assertFalse(evaluate_project({'motors': [motor]})['calculation']['canExport'])
+        motor['mainSchemeCode'] = '../secret'
+        with self.assertRaises(ValueError):
+            validate_project({'motors': [motor]})
+
     @classmethod
     def setUpClass(cls):
         cls.server = ThreadingHTTPServer(('127.0.0.1', 0), api.Handler)
@@ -104,6 +115,24 @@ class EngineApiTests(unittest.TestCase):
 
     def test_unknown_block_export_rejected(self):
         self.assertEqual(self.post('/generate', {'motors': [complete()], 'blockId': 'other', 'ruleFingerprint': RULE_FINGERPRINT})[0], 422)
+
+    def test_busy_generator_does_not_leave_unused_manifests(self):
+        with tempfile.TemporaryDirectory(prefix='l-busy-') as directory:
+            with patch.object(api, 'OUTPUT', Path(directory)), patch.object(api, 'GENERATION_SLOTS', threading.BoundedSemaphore(0)):
+                status, _ = self.post('/generate', {'motors': [complete()], 'ruleFingerprint': RULE_FINGERPRINT})
+                self.assertEqual(status, 503)
+                self.assertEqual(list(Path(directory).iterdir()), [])
+
+    def test_large_download_and_head_preserve_file_size_and_contents(self):
+        contents = bytes(range(256)) * 3000
+        filename = 'cabinet-' + 'a' * 32 + '.zip'
+        with tempfile.TemporaryDirectory(prefix='l-stream-') as directory, patch.object(api, 'OUTPUT', Path(directory)):
+            (Path(directory) / filename).write_bytes(contents)
+            with urlopen(Request(self.url + '/files/' + filename, method='HEAD')) as response:
+                self.assertEqual(int(response.headers['Content-Length']), len(contents))
+                self.assertEqual(response.read(), b'')
+            with urlopen(self.url + '/files/' + filename) as response:
+                self.assertEqual(response.read(), contents)
 
     def test_real_export_downloads_two_documents_with_repeated_blocks(self):
         first = complete()

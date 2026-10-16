@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import json
+from collections import deque
 from functools import lru_cache
 from pathlib import Path
+from typing import NamedTuple
 
 CATALOG = json.loads((Path(__file__).resolve().parents[1] / 'data/plc-catalog.json').read_text(encoding='utf-8'))
 if CATALOG.get('schemaVersion') != 2:
@@ -12,6 +14,8 @@ CODES = tuple(CATALOG['controller']['limits'])
 MAX_MODULES = int(CATALOG['controller']['maxModules'])
 BASE_AMOUNT = int(CATALOG['controller']['generalSignalAmount'])
 MODULE_AMOUNT = int(CATALOG['module']['generalSignalAmount'])
+CAPACITIES = tuple(tuple(CATALOG['controller']['limits'][code] + amount * CATALOG['module']['limits'][code]
+                         for code in CODES) for amount in range(MAX_MODULES + 1))
 
 
 def inventory(module_count):
@@ -48,13 +52,16 @@ def demands_for(counts):
     return [code for code, count in zip(CODES, counts) for _ in range(count)]
 
 
+def within_capacity(counts, module_count):
+    """Necessary capacity bounds before exact pin matching."""
+    return (sum(counts) <= BASE_AMOUNT + module_count * MODULE_AMOUNT and
+            all(count <= limit for count, limit in zip(counts, CAPACITIES[module_count])))
+
+
 @lru_cache(maxsize=8192)
 def feasible_match(counts, module_count):
     """Exact bipartite matching: one signal per resource on each device."""
-    if sum(counts) > BASE_AMOUNT + module_count * MODULE_AMOUNT:
-        return False
-    if any(count > CATALOG['controller']['limits'][code] + module_count * CATALOG['module']['limits'][code]
-           for code, count in zip(CODES, counts)):
+    if not within_capacity(counts, module_count):
         return False
     demands = demands_for(counts)
     by_code, _ = indexed_inventory(module_count)
@@ -76,13 +83,14 @@ def feasible_match(counts, module_count):
     return all(visit(index, set()) for index in order)
 
 
-def min_modules(counts):
-    return next((amount for amount in range(MAX_MODULES + 1) if feasible_match(counts, amount)), None)
-
-
 def pin_match(counts, module_count=0):
+    matched = _pin_match(tuple(counts), module_count)
+    return dict(matched) if matched is not None else None
+
+
+@lru_cache(maxsize=128)
+def _pin_match(counts, module_count):
     """Choose a global minimum-cost feasible assignment for one cabinet."""
-    counts = tuple(counts)
     if not feasible_match(counts, module_count):
         return None
     demands = demands_for(counts)
@@ -143,38 +151,69 @@ def pin_match(counts, module_count=0):
     return chosen if len(chosen) == n and all(chosen.values()) else None
 
 
-def allocate_io(blocks):
-    """Choose OL variants, then the fewest modules and a global pin placement."""
-    if not blocks:
-        return dict(allocations=[], totals={code: 0 for code in CODES}, modules=[])
-    states = {tuple(0 for _ in CODES): ([], 0, ())}
-    for block in blocks:
-        if not block['candidates']:
-            return dict(allocations=[], error=f"Нет варианта схемы для блока {block['id']}.")
+class SelectionPlan(NamedTuple):
+    counts: tuple
+    choices: tuple
+    module_count: int
+    failed_at: int | None = None
+
+
+@lru_cache(maxsize=64)
+def select_plan(block_choices):
+    """Cache resource decisions, never block identities, labels, or mutable output."""
+    states = {tuple(0 for _ in CODES): ((), 0, ())}
+    for block_index, candidates in enumerate(block_choices):
         next_states = {}
         for counts, (selected, penalty, rows) in states.items():
-            for candidate in block['candidates']:
-                io = candidate['io']
-                if any(code not in CODES or isinstance(value, bool) or not isinstance(value, int) or value < 0
-                       for code, value in io.items()):
-                    return dict(allocations=[], error=f"Некорректный I/O: {block['id']}, строка {candidate['sourceRow']}.")
-                updated = tuple(count + io.get(code, 0) for code, count in zip(CODES, counts))
-                if not feasible_match(updated, MAX_MODULES):
+            for index, (source_row, demand, extra_penalty) in enumerate(candidates):
+                updated = tuple(count + extra for count, extra in zip(counts, demand))
+                # Demand only grows, so a state beyond these bounds stays infeasible.
+                if not within_capacity(updated, MAX_MODULES):
                     continue
-                next_penalty = penalty + io.get('DI24-NPN', 0) * 2 + io.get('DI24-HSC-NPN', 0) * 2 + io.get('DOR-NO', 0)
-                path = (selected + [candidate], next_penalty, rows + (candidate['sourceRow'],))
+                path = (selected + (index,), penalty + extra_penalty, rows + (source_row,))
                 if updated not in next_states or path[1:] < next_states[updated][1:]:
                     next_states[updated] = path
         states = next_states
         if not states:
-            return dict(allocations=[], error=f"Недостаточно совместимых выводов {CATALOG['controller']['brand']} {CATALOG['controller']['model']} и {MAX_MODULES} модулей для {block['id']}.")
-    counts, (selected, _, _) = min(states.items(), key=lambda item: (
-        min_modules(item[0]), sum(item[0]), item[1][1], item[1][2]))
-    module_count = min_modules(counts)
+            return SelectionPlan((), (), 0, block_index)
+    ordered = sorted(states.items(), key=lambda item: (sum(item[0]), item[1][1], item[1][2]))
+    # Search in the same objective order as the former exhaustive comparison.
+    # The first exact match is optimal; testing all remaining feasible plans is redundant.
+    for module_count in range(MAX_MODULES + 1):
+        for counts, (selected, _, _) in ordered:
+            if within_capacity(counts, module_count) and feasible_match(counts, module_count):
+                return SelectionPlan(counts, selected, module_count)
+    return SelectionPlan((), (), 0)
+
+
+def allocate_io(blocks):
+    """Choose OL variants, then the fewest modules and a global pin placement."""
+    if not blocks:
+        return dict(allocations=[], totals={code: 0 for code in CODES}, modules=[])
+    block_choices = []
+    for block in blocks:
+        if not block['candidates']:
+            return dict(allocations=[], error=f"Нет варианта схемы для блока {block['id']}.")
+        candidates = []
+        for candidate in block['candidates']:
+            io = candidate['io']
+            if any(code not in CODES or isinstance(value, bool) or not isinstance(value, int) or value < 0
+                   for code, value in io.items()):
+                return dict(allocations=[], error=f"Некорректный I/O: {block['id']}, строка {candidate['sourceRow']}.")
+            candidates.append((candidate['sourceRow'], tuple(io.get(code, 0) for code in CODES),
+                               io.get('DI24-NPN', 0) * 2 + io.get('DI24-HSC-NPN', 0) * 2 + io.get('DOR-NO', 0)))
+        block_choices.append(tuple(candidates))
+    plan = select_plan(tuple(block_choices))
+    if plan.failed_at is not None:
+        return dict(allocations=[], error=f"Недостаточно совместимых выводов {CATALOG['controller']['brand']} {CATALOG['controller']['model']} и {MAX_MODULES} модулей для {blocks[plan.failed_at]['id']}.")
+    if not plan.counts:
+        return dict(allocations=[], error='Недостаточно совместимых выводов ПЛК для выбранных схем.')
+    counts, module_count = plan.counts, plan.module_count
+    selected = [block['candidates'][index] for block, index in zip(blocks, plan.choices)]
     matched = pin_match(counts, module_count)
     if matched is None:
         return dict(allocations=[], error='Не удалось назначить совместимые выводы ПЛК.')
-    pool = {code: [] for code in CODES}
+    pool = {code: deque() for code in CODES}
     for index, code in enumerate(demands_for(counts)):
         pool[code].append(matched[index])
     allocations = []
@@ -182,7 +221,7 @@ def allocate_io(blocks):
         channels = []
         for code in CODES:
             for _ in range(scheme['io'].get(code, 0)):
-                option = pool[code].pop(0)
+                option = pool[code].popleft()
                 channels.append(dict(family=code, address=option['terminals'][0],
                                      terminals=option['terminals'], group=option['group'],
                                      deviceRef=option['deviceRef'], terminalStatus=option['terminalStatus'],

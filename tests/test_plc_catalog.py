@@ -14,6 +14,18 @@ def demand(identity, io, source_row=2):
 
 
 class PlcCatalogTests(unittest.TestCase):
+    def test_reused_plan_keeps_each_requests_identity_and_current_scheme(self):
+        first = allocate_io([demand('first', {'DI24-PNP': 1})])
+        first['allocations'][0]['channels'][0]['address'] = 'changed'
+        second_demand = demand('second', {'DI24-PNP': 1})
+        second_demand['candidates'][0]['diagram1'] = 'current-template'
+        second = allocate_io([second_demand])
+        self.assertEqual(second['allocations'][0]['id'], 'second')
+        self.assertEqual(second['allocations'][0]['scheme']['diagram1'], 'current-template')
+        self.assertEqual(second['allocations'][0]['channels'][0]['address'], '01')
+        failed = allocate_io([demand('new-error-id', {'DOR-NO': 31})])
+        self.assertIn('new-error-id', failed['error'])
+
     def test_snapshot_tracks_both_supplied_workbooks(self):
         for key in ('composition', 'marking'):
             source = CATALOG['sources'][key]
@@ -87,6 +99,17 @@ class PlcCatalogTests(unittest.TestCase):
         ]}])
         self.assertEqual(result['allocations'][0]['scheme']['sourceRow'], 3)
         self.assertEqual(result['modules'], [])
+
+    def test_plan_preserves_resource_and_signal_preferences_with_equal_modules(self):
+        for candidates, expected_row in (
+            ([{'sourceRow': 2, 'io': {'DOT-PNP': 2}}, {'sourceRow': 3, 'io': {'DOT-PNP': 1}}], 3),
+            ([{'sourceRow': 2, 'io': {'DI24-NPN': 1}}, {'sourceRow': 3, 'io': {'DI24-PNP': 1}}], 3),
+            ([{'sourceRow': 3, 'io': {'DI24-PNP': 1}}, {'sourceRow': 2, 'io': {'DI24-PNP': 1}}], 2),
+        ):
+            with self.subTest(candidates=candidates):
+                result = allocate_io([{'id': 'choice', 'candidates': candidates}])
+                self.assertEqual(result['modules'], [])
+                self.assertEqual(result['allocations'][0]['scheme']['sourceRow'], expected_row)
 
     def test_five_module_limit_is_enforced(self):
         self.assertEqual(len(allocate_io([demand('relays', {'DOR-NO': 30})])['modules']), 5)

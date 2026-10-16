@@ -11,10 +11,12 @@ from __future__ import annotations
 
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from functools import lru_cache
 import json
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import sys
 import uuid
@@ -35,12 +37,9 @@ PORT = int(os.environ.get("L_DXF_PORT", "3001"))
 ALLOWED_ORIGINS = {item.strip().rstrip("/") for item in os.environ.get("L_DXF_ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:3003").split(",") if item.strip()}
 
 
-def known_codes() -> set[str]:
-    library = json.loads(LIBRARY.read_text(encoding="utf-8"))
-    return {str(item["code"]).casefold() for item in library["sources"] if item["status"] == "found"}
-
-
-def drawing_kinds():
+@lru_cache(maxsize=1)
+def template_index():
+    """The versioned template snapshot changes only on service restart."""
     library = json.loads(LIBRARY.read_text(encoding='utf-8'))
     result = {}
     for record in library['sources']:
@@ -48,7 +47,8 @@ def drawing_kinds():
         if len(kinds) != 1:
             raise ValueError(f"Неоднозначное назначение шаблона {record['code']}")
         result[record['code'].casefold()] = kinds.pop()
-    return result
+    known = frozenset(str(item['code']).casefold() for item in library['sources'] if item['status'] == 'found')
+    return known, result
 
 
 def allowed_origin(handler: BaseHTTPRequestHandler) -> str | None:
@@ -86,8 +86,7 @@ def validate_instances(payload):
         instances = [{"id": str(index), "tag": "", "code": code} for index, code in enumerate(codes)]
     if not isinstance(instances, list) or not 1 <= len(instances) <= 1000:
         raise ValueError("Допустимо от 1 до 1000 фрагментов DXF")
-    known = known_codes()
-    kinds = drawing_kinds()
+    known, kinds = template_index()
     seen = set()
     result = []
     for item in instances:
@@ -147,14 +146,14 @@ class Handler(BaseHTTPRequestHandler):
             instances = validate_instances({'instances': [i for i in calculation['instances'] if block_id is None or i['blockId'] == block_id]})
             normalized = [item["code"] for item in instances]
             filename = f"cabinet-{uuid.uuid4().hex}.zip"
-            OUTPUT.mkdir(parents=True, exist_ok=True)
             target = OUTPUT / filename
             manifest = target.with_suffix(".json")
-            manifest.write_text(json.dumps({"schemaVersion": 2, "status": "draft", "instances": instances, "ruleFingerprint": calculation['ruleFingerprint'], "project": evaluated['calculation']['blocks'], "notice": "Server-calculated electrical and external drawing sets. Template composition, not released electrical documentation."}, ensure_ascii=False, indent=2), encoding="utf-8")
             if not GENERATION_SLOTS.acquire(blocking=False):
                 json_response(self, HTTPStatus.SERVICE_UNAVAILABLE, {"error": "Генератор занят. Повтори запрос через несколько секунд."})
                 return
             try:
+                OUTPUT.mkdir(parents=True, exist_ok=True)
+                manifest.write_text(json.dumps({"schemaVersion": 2, "status": "draft", "instances": instances, "plcHardware": calculation['plcHardware'], "ruleFingerprint": calculation['ruleFingerprint'], "project": calculation['blocks'], "notice": "Server-calculated electrical and external drawing sets. Template composition, not released electrical documentation."}, ensure_ascii=False, indent=2), encoding="utf-8")
                 result = subprocess.run(
                 [sys.executable, str(ASSEMBLER), "--output", str(target), "--manifest", str(manifest)],
                 cwd=ROOT,
@@ -205,17 +204,17 @@ class Handler(BaseHTTPRequestHandler):
         if not target.is_file():
             json_response(self, HTTPStatus.NOT_FOUND, {"error": "Generated DXF not found"})
             return
-        contents = target.read_bytes()
-        self.send_response(HTTPStatus.OK)
-        self.send_header("Content-Type", {'.dxf': 'application/dxf', '.zip': 'application/zip', '.json': 'application/json; charset=utf-8'}[target.suffix])
-        self.send_header("X-Content-Type-Options", "nosniff")
-        self.send_header("Cache-Control", "no-store")
-        self.send_header("Content-Length", str(len(contents)))
-        self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
-        cors_headers(self)
-        self.end_headers()
-        if self.command != "HEAD":
-            self.wfile.write(contents)
+        with target.open('rb') as contents:
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", {'.dxf': 'application/dxf', '.zip': 'application/zip', '.json': 'application/json; charset=utf-8'}[target.suffix])
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Content-Length", str(os.fstat(contents.fileno()).st_size))
+            self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
+            cors_headers(self)
+            self.end_headers()
+            if self.command != "HEAD":
+                shutil.copyfileobj(contents, self.wfile, length=64 * 1024)
 
     def do_HEAD(self) -> None:
         self.do_GET()

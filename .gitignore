@@ -40,10 +40,14 @@ next-env.d.ts
 /.cache/
 __pycache__/
 /scripts/node_modules
-/output/generated/
+/output/
 *.tsbuildinfo
 /data/dxf-frames/*.log
 /data/dxf-frames/logs/
+/data/dxf-sources/*.log
+/data/dxf-sources/logs/
+/data/dxf-previews/
+*.inspect.ndjson
 
 # Local Netlify folder
 .netlify

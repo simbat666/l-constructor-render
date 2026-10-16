@@ -1,5 +1,5 @@
 /** UI contracts only. Engineering rules and graph traversal live in Python. */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useState } from 'react';
 
 export type QuestionnaireState = {
   selected: Record<string, string>;
@@ -14,9 +14,10 @@ export type QuestionNode = {
 export type VisibleGroup = {
   key: string; sheet: string; question: string; fieldType: string; nodes: QuestionNode[]; required: boolean;
 };
-export type ProjectMotor = { id: string; tag: string; state: QuestionnaireState };
-type TraceEntry = { id: string; title: string; detail: string; source?: string };
-type SchemeRow = Record<string, any>;
+export type ProjectMotor = { id: string; tag: string; state: QuestionnaireState; mainSchemeCode?: string };
+export type TraceEntry = { id: string; title: string; detail: string; source?: string };
+export type DecisionTraceData = { inputs: TraceEntry[]; rules: TraceEntry[]; outputs: TraceEntry[] };
+export type SchemeRow = { sourceRow: number; diagram1: string | null; diagram2: string | null };
 export type Channel = {
   family: string; address: string; terminals: string[]; group: string;
   deviceRef: string; terminalStatus: 'source' | 'testDerived';
@@ -26,9 +27,10 @@ export type Calculation = {
   schemaVersion: number; ruleFingerprint: string; status: string;
   blocks: Array<ProjectMotor & {
     errors: string[]; warnings: string[]; main?: SchemeRow;
+    mainChoices: Array<{code: string; io: Record<string, number>; sourceRow: number}>;
     optional: Array<{row: SchemeRow; sourceOrder: string}>; channels: Channel[];
     loadIndex: string | null; specification: Array<{name: string; quantity: number; unit: string; source: string}>;
-    decisionTrace: { inputs: TraceEntry[]; rules: TraceEntry[]; outputs: TraceEntry[] };
+    decisionTrace: DecisionTraceData;
   }>;
   instances: Array<{id: string; blockId: string; tag: string; code: string; source: string; drawingKind: string; channels: Channel[]}>;
   errors: string[]; warnings: string[]; controllerFamily: string | null;
@@ -49,22 +51,41 @@ export function numericInputRule(rule: string | null) {
 }
 
 export function projectVersion(motors: ProjectMotor[]) {
-  return JSON.stringify(motors.map(({id, tag, state}) => ({id, tag, state})));
+  return JSON.stringify(motors.map(({id, tag, state, mainSchemeCode}) => ({id, tag, state, ...(mainSchemeCode ? {mainSchemeCode} : {})})));
+}
+
+/** Preserve unchanged blocks so a calculation response does not rerender the whole field. */
+export function applyNormalizedAnswers<T extends ProjectMotor>(motors: T[], normalized: ProjectMotor[]): T[] {
+  const byId = new Map(normalized.map(motor => [motor.id, motor.state]));
+  let changed = false;
+  const result = motors.map(motor => {
+    const state = byId.get(motor.id);
+    if (!state || JSON.stringify(state) === JSON.stringify(motor.state)) return motor;
+    changed = true;
+    return { ...motor, state };
+  });
+  return changed ? result : motors;
 }
 
 export function useEngineering(motors: ProjectMotor[], accept: (motors: ProjectMotor[]) => void) {
   const version = projectVersion(motors);
-  const latest = useRef(version);
-  latest.current = version;
-  const acceptRef = useRef(accept);
-  acceptRef.current = accept;
   const [response, setResponse] = useState<(ResponseData & {version: string}) | null>(null);
-  const [error, setError] = useState('');
+  const [failure, setFailure] = useState<{version: string; attempt: number; message: string} | null>(null);
   const [attempt, retry] = useState(0);
+  const receive = useEffectEvent((data: ResponseData, requestedVersion: string) => {
+    if (version !== requestedVersion) return;
+    const normalized = data.calculation.blocks;
+    setFailure(null);
+    setResponse({...data, version: projectVersion(normalized)});
+    accept(normalized);
+  });
+  const fail = useEffectEvent((reason: unknown, requestedVersion: string) => {
+    if (version !== requestedVersion) return;
+    setFailure({version, attempt, message: reason instanceof Error ? reason.message : 'Сервер расчёта недоступен'});
+  });
   useEffect(() => {
     if (response?.version === version) return;
     const controller = new AbortController();
-    setError('');
     const timer = setTimeout(async () => {
       try {
         const result = await fetch('/api/cad/calculate', {
@@ -73,22 +94,18 @@ export function useEngineering(motors: ProjectMotor[], accept: (motors: ProjectM
         });
         const data = await result.json();
         if (!result.ok) throw new Error(data.error || 'Ошибка расчёта');
-        if (controller.signal.aborted || latest.current !== version) return;
-        const normalized = data.calculation.blocks as ProjectMotor[];
-        const acceptedVersion = projectVersion(normalized);
-        setResponse({...data, version: acceptedVersion});
-        acceptRef.current(normalized);
+        if (!controller.signal.aborted) receive(data, version);
       } catch (reason) {
-        if (!controller.signal.aborted && latest.current === version)
-          setError(reason instanceof Error ? reason.message : 'Сервер расчёта недоступен');
+        if (!controller.signal.aborted) fail(reason, version);
       }
     }, 250);
     return () => { clearTimeout(timer); controller.abort(); };
   }, [version, attempt, response?.version]);
+  const error = failure?.version === version && failure.attempt === attempt ? failure.message : '';
   const ready = response?.version === version && !error;
   return {
     cabinet: ready ? response.calculation : empty,
     forms: response?.forms || {}, revision: response?.revision || 'загрузка…',
-    ready, error, retry: () => retry(value => value + 1),
+    version, ready, error, retry: () => retry(value => value + 1),
   };
 }

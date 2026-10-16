@@ -2,6 +2,8 @@
 import json
 import math
 import re
+from collections import deque
+from functools import lru_cache
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -29,7 +31,18 @@ def binds(node):
     return [part.strip() for part in (node.get('binds') or '').split(';') if part.strip()]
 
 def semantic_key(node):
-    return node.get('engineKey') or next((b['key'] for b in BINDINGS['fields'] if b['sheet'] == node['sheet'] and norm(b['question']) == norm(node['question'])), None)
+    return node.get('engineKey') or FIELD_KEYS.get((node['sheet'], norm(node['question'])))
+
+
+# Rules are loaded once per process; request state never changes these indexes.
+FIELD_KEYS = {}
+for binding in BINDINGS['fields']:
+    FIELD_KEYS.setdefault((binding['sheet'], norm(binding['question'])), binding['key'])
+TARGETS = {node['order']: tuple(binds(node)) for node in NODES}
+REFERENCED = {order for targets in TARGETS.values() for order in targets}
+ROOT_ORDERS = tuple(node['order'] for node in NODES if node['sheet'] == 'Ques 1'
+                    and node['order'] not in REFERENCED and norm(node['answer']) != 'unused')
+STATE_PARTS = ('selected', 'inputs', 'checks', 'uploads')
 
 def number(value):
     try:
@@ -69,24 +82,30 @@ def input_error(node, raw):
     return None
 
 def visible_groups(state):
-    referenced = {order for node in NODES for order in binds(node)}
-    distance = {node['order']: 0 for node in NODES if node['sheet'] == 'Ques 1' and node['order'] not in referenced and norm(node['answer']) != 'unused'}
-    changed = True
-    while changed:
-        changed = False
-        for node in NODES:
-            if node['order'] not in distance:
-                continue
-            kind, key = node['fieldType'], node_key(node)
-            follow = ((kind in SELECTORS and state['selected'].get(group_key(node)) == node['order']) or
-                      (kind == 'input' and bool(state['inputs'].get(key, '').strip()) and not input_error(node, state['inputs'].get(key))) or
-                      (kind == 'check_box' and state['checks'].get(key) is True) or
-                      (kind == 'uploadButton' and bool(state['uploads'].get(key))))
-            if follow:
-                for order in binds(node):
-                    if order in BY_ORDER and distance[node['order']] + 1 < distance.get(order, math.inf):
-                        distance[order] = distance[node['order']] + 1
-                        changed = True
+    key = tuple(tuple(sorted(state[part].items())) for part in STATE_PARTS)
+    # Return independent dictionaries: callers must not mutate another request's form.
+    return [dict(group, nodes=[dict(node) for node in group['nodes']])
+            for group in _visible_groups(key)]
+
+
+@lru_cache(maxsize=128)
+def _visible_groups(key):
+    state = dict(zip(STATE_PARTS, map(dict, key)))
+    distance = dict.fromkeys(ROOT_ORDERS, 0)
+    pending = deque(ROOT_ORDERS)
+    while pending:
+        order = pending.popleft()
+        node = BY_ORDER[order]
+        kind, key = node['fieldType'], node_key(node)
+        follow = ((kind in SELECTORS and state['selected'].get(group_key(node)) == order) or
+                  (kind == 'input' and bool(state['inputs'].get(key, '').strip()) and not input_error(node, state['inputs'].get(key))) or
+                  (kind == 'check_box' and state['checks'].get(key) is True) or
+                  (kind == 'uploadButton' and bool(state['uploads'].get(key))))
+        if follow:
+            for target in TARGETS[order]:
+                if target in BY_ORDER and target not in distance:
+                    distance[target] = distance[order] + 1
+                    pending.append(target)
     active = [n for n in NODES if n['order'] in distance and n['question'] and n['fieldType']]
     closest = {}
     for node in active:

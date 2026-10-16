@@ -5,6 +5,22 @@ import { fileURLToPath } from 'node:url';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const jiti = createJiti(import.meta.url, { alias: { '@': root } });
 const { POST: proxyPost } = await jiti.import('../app/api/cad/[...path]/route.ts');
+const { applyNormalizedAnswers } = await jiti.import('../lib/engineering-client.ts');
+
+test('server normalization preserves unchanged blocks and only replaces pruned answers', () => {
+  const state = { selected: {}, inputs: {}, checks: {}, uploads: {} };
+  const motors = [
+    { id: 'one', tag: 'M1', cell: 4, state: { ...state, inputs: { hidden: '30' } } },
+    { id: 'two', tag: 'M2', cell: 5, state },
+  ];
+  assert.equal(applyNormalizedAnswers(motors, structuredClone(motors)), motors);
+  const result = applyNormalizedAnswers(motors, [{ ...motors[0], state }, motors[1]]);
+  assert.notEqual(result, motors);
+  assert.equal(result[1], motors[1]);
+  assert.equal(result[0].cell, 4);
+  assert.deepEqual(result[0].state.inputs, {});
+  assert.deepEqual(motors[0].state.inputs, { hidden: '30' });
+});
 
 test('calculation proxy drains large upstream JSON before returning to a slow client', async () => {
   const originalFetch = globalThis.fetch;

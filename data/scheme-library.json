@@ -67,11 +67,11 @@
       "code": "im1-011",
       "status": "found",
       "archiveFile": null,
-      "sourceOverride": "user-supplied im1-011.dwg",
+      "sourceOverride": "user-supplied im1-011 [Pckday].dwg",
       "localFile": "cad-sources/im1-011.dwg",
       "alias": null,
-      "bytes": 61115,
-      "sha256": "8d1ccccfcd8d37ef73045c7bf458c11f4494da13824dd201d6127c5e748397a9",
+      "bytes": 61150,
+      "sha256": "b42cc2997098a437e469a43ad787d2df0010286579b2ea62514b28186d14f130",
       "uses": [
         {
           "sheet": "diagram 1",
@@ -83,50 +83,53 @@
     {
       "code": "im1-012",
       "status": "found",
-      "archiveFile": "im1-012.dwg",
+      "archiveFile": null,
       "localFile": "cad-sources/im1-012.dwg",
       "alias": null,
-      "bytes": 79663,
-      "sha256": "466bf616f70c6a8d5d9751b619bb6e1a841b5bd135f2a3c31ac55f38c740903c",
+      "bytes": 61149,
+      "sha256": "dab628ddd4851197b2c4bde0d192e452ef727820f5f045781db547bd6bb87573",
       "uses": [
         {
           "sheet": "diagram 1",
           "sourceRow": 14,
           "field": "diagram1"
         }
-      ]
+      ],
+      "sourceOverride": "user-supplied im1-012.dwg"
     },
     {
       "code": "im1-013",
       "status": "found",
-      "archiveFile": "im1-013.dwg",
+      "archiveFile": null,
       "localFile": "cad-sources/im1-013.dwg",
       "alias": null,
-      "bytes": 79663,
-      "sha256": "4f3ebe3bfb3091b30b435d73776a0a1282b89490814133a93bc95a4e4330f015",
+      "bytes": 61119,
+      "sha256": "09cae92daf5fa9538af151d8087cb0ff974328a30280aea13b005ac61f8cf85e",
       "uses": [
         {
           "sheet": "diagram 1",
           "sourceRow": 26,
           "field": "diagram1"
         }
-      ]
+      ],
+      "sourceOverride": "user-supplied im1-013.dwg"
     },
     {
       "code": "im1-014",
       "status": "found",
-      "archiveFile": "im1-014.dwg",
+      "archiveFile": null,
       "localFile": "cad-sources/im1-014.dwg",
       "alias": null,
-      "bytes": 79663,
-      "sha256": "8e14c8c84cc12c429b3138b557652cbf297255c817fe10c0c2a5488205fd5efc",
+      "bytes": 65369,
+      "sha256": "ad313137e27aaa1d7718474f99d6622777949200740f89071c163506066bf28c",
       "uses": [
         {
           "sheet": "diagram 1",
           "sourceRow": 38,
           "field": "diagram1"
         }
-      ]
+      ],
+      "sourceOverride": "user-supplied im1-014.dwg"
     },
     {
       "code": "im1-021",

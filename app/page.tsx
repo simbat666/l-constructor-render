@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type SubmitEvent, type ReactNode } from 'react';
 import {
   ArrowLeft,
   ArrowUpRight,
@@ -17,12 +17,17 @@ import {
   Trash2,
   TriangleAlert,
 } from 'lucide-react';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
   initialQuestionnaireState,
   numericInputRule,
   useEngineering,
+  applyNormalizedAnswers,
+  type SchemeRow,
+  type TraceEntry,
+  type DecisionTraceData,
   type QuestionnaireState,
   type VisibleGroup,
   type Channel,
@@ -55,21 +60,9 @@ const sheetTitles: Record<string, string> = {
   'Ques 3': 'Ручной выбор ЧП',
   'Ques 4': 'Резерв опросника',
 };
-type DiagramRow = Record<string, any>;
-type OptionalRow = { row: DiagramRow; sourceOrder: string };
-type DecisionTraceEntry = {
-  id: string;
-  title: string;
-  detail: string;
-  source?: string;
-};
-type DecisionTraceData = {
-  inputs: DecisionTraceEntry[];
-  rules: DecisionTraceEntry[];
-  outputs: DecisionTraceEntry[];
-};
+type OptionalRow = { row: SchemeRow; sourceOrder: string };
 type DrawingDownload = { kind: string; title: string; downloadPath: string };
-type Generation =
+type Generation = (
   | { status: 'idle' }
   | { status: 'working' }
   | {
@@ -78,12 +71,14 @@ type Generation =
       downloadUrl: string;
       drawings: DrawingDownload[];
     }
-  | { status: 'error'; message: string };
+  | { status: 'error'; message: string }) & { version?: string };
+const idleGeneration: Generation = { status: 'idle' };
 type MotorBlock = {
   id: string;
   tag: string;
   cell: number;
   state: QuestionnaireState;
+  mainSchemeCode?: string;
   requested: boolean;
   generation: Generation;
 };
@@ -109,7 +104,7 @@ function LoginScreen({ onLogin }: { onLogin: (user: string) => void }) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [working, setWorking] = useState(false);
-  const submit = async (event: FormEvent<HTMLFormElement>) => {
+  const submit = async (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     setWorking(true);
     setError('');
@@ -134,11 +129,11 @@ function LoginScreen({ onLogin }: { onLogin: (user: string) => void }) {
       <div className="l-block-gradient grid size-11 place-items-center rounded-2xl text-lg font-black text-white">L</div>
       <h1 className="mt-5 text-2xl font-semibold tracking-[-.04em]">L Constructor</h1>
       <p className="mt-2 text-sm leading-6 text-[#747480]">Вход в закрытый инженерный стенд.</p>
-      <label className="mt-6 block text-xs font-semibold text-[#555563]">Логин
-        <Input className="mt-2" autoComplete="username" value={username} onChange={(event) => setUsername(event.target.value)} required />
+      <label htmlFor="login-username" className="mt-6 block text-xs font-semibold text-[#555563]">Логин
+        <Input id="login-username" className="mt-2" autoComplete="username" value={username} onChange={(event) => setUsername(event.target.value)} required />
       </label>
-      <label className="mt-4 block text-xs font-semibold text-[#555563]">Пароль
-        <Input className="mt-2" type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required />
+      <label htmlFor="login-password" className="mt-4 block text-xs font-semibold text-[#555563]">Пароль
+        <Input id="login-password" className="mt-2" type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required />
       </label>
       {error && <p className="mt-4 text-sm text-[#c83c58]">{error}</p>}
       <Button className="mt-6 w-full" type="submit" disabled={working}>{working ? 'Входим…' : 'Войти'}</Button>
@@ -185,7 +180,7 @@ function ProjectHome({ user, onLogout }: { user: string | null; onLogout: () => 
   const [screen, setScreen] = useState<ProjectScreen>({ kind: 'projects' });
   const [projectName, setProjectName] = useState('');
   const [workspaceName, setWorkspaceName] = useState('');
-  const createProject = (event: FormEvent<HTMLFormElement>) => {
+  const createProject = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     const project = newProject(projectName);
     const next = { projects: [...catalog.projects, project] };
@@ -195,7 +190,7 @@ function ProjectHome({ user, onLogout }: { user: string | null; onLogout: () => 
     setScreen({ kind: 'workspaces', projectId: project.id });
   };
   const project = screen.kind === 'projects' ? null : catalog.projects.find((item) => item.id === screen.projectId) || null;
-  const createWorkspace = (event: FormEvent<HTMLFormElement>) => {
+  const createWorkspace = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!project) return;
     const next = addWorkspace(catalog, project.id, workspaceName);
@@ -257,34 +252,24 @@ function CabinetApp({ user, project, workspace, onBack, onLogout }: { user: stri
   const [activeMotorId, setActiveMotorId] = useState<string | null>(savedProject.activeMotorId);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(savedProject.sheetOpen);
-  const [cabinetGeneration, setCabinetGeneration] = useState<Generation>({
+  const [cabinetExport, setCabinetGeneration] = useState<Generation>({
     status: 'idle',
   });
   const engineering = useEngineering(motors, (normalized) => {
-    setMotors(current => current.map(motor => {
-      const accepted = normalized.find(item => item.id === motor.id);
-      return accepted ? {...motor, state: accepted.state} : motor;
-    }));
+    setMotors(current => applyNormalizedAnswers(current, normalized));
   });
   const {cabinet, revision: questionnaireRevision} = engineering;
-  const inputVersion = JSON.stringify(
-    motors.map(({ id, tag, state }) => ({ id, tag, state })),
-  );
+  const inputVersion = engineering.version;
+  const cabinetGeneration = cabinetExport.version === inputVersion ? cabinetExport : idleGeneration;
   useEffect(() => {
     saveLocalWorkspace(user, project.id, workspace.id, {
-      motors: motors.map(({ id, tag, cell, state }) => ({ id, tag, cell, state })),
+      motors: motors.map(({ id, tag, cell, state, mainSchemeCode }) => ({ id, tag, cell, state, ...(mainSchemeCode ? { mainSchemeCode } : {}) })),
       activeMotorId,
       sheetOpen,
     });
   }, [user, project.id, workspace.id, motors, activeMotorId, sheetOpen]);
   const latestVersion = useRef(inputVersion);
-  latestVersion.current = inputVersion;
-  useEffect(() => {
-    setCabinetGeneration({ status: 'idle' });
-    setMotors((current) =>
-      current.map((motor) => ({ ...motor, generation: { status: 'idle' } })),
-    );
-  }, [inputVersion]);
+  useLayoutEffect(() => { latestVersion.current = inputVersion; }, [inputVersion]);
   const activeMotor =
     motors.find((motor) => motor.id === activeMotorId) || null;
   const pendingDelete =
@@ -381,102 +366,47 @@ function CabinetApp({ user, project, workspace, onBack, onLogout }: { user: stri
       ),
     );
   };
-  const generateDxf = async () => {
-    if (!engineering.ready || !cabinet.canExport || !schemeCodes.length || !activeMotorId) return;
+  const generate = async (blockId?: string) => {
+    if (!engineering.ready || !cabinet.canExport) return;
     const version = inputVersion;
-    setMotors((current) =>
-      current.map((motor) =>
-        motor.id === activeMotorId
-          ? { ...motor, generation: { status: 'working' } }
-          : motor,
-      ),
-    );
+    const setGeneration = (result: Generation) => {
+      const generation = { ...result, version };
+      if (blockId) {
+        setMotors(current => current.map(motor => motor.id === blockId ? { ...motor, generation } : motor));
+      } else {
+        setCabinetGeneration(generation);
+      }
+    };
+    setGeneration({ status: 'working' });
     try {
       const response = await fetch(`${DXF_API_URL}/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          motors: JSON.parse(inputVersion),
-          blockId: activeMotorId,
+          motors: JSON.parse(version),
+          ...(blockId ? { blockId } : {}),
           ruleFingerprint: cabinet.ruleFingerprint,
         }),
       });
-      const result = (await response.json()) as {
-        error?: string;
-        message?: string;
-        downloadPath?: string;
-        drawings?: DrawingDownload[];
+      const result = await response.json() as {
+        error?: string; message?: string; downloadPath?: string; drawings?: DrawingDownload[];
       };
       if (!response.ok || !result.downloadPath)
         throw new Error(result.error || 'Не удалось собрать DXF.');
       if (latestVersion.current !== version) return;
-      setMotors((current) =>
-        current.map((motor) =>
-          motor.id === activeMotorId
-            ? {
-                ...motor,
-                generation: {
-                  status: 'success',
-                  message: result.message || 'DXF собран и проверен.',
-                  downloadUrl: `${DXF_API_URL}${result.downloadPath}`,
-                  drawings: result.drawings || [],
-                },
-              }
-            : motor,
-        ),
-      );
-    } catch (error) {
-      if (latestVersion.current !== version) return;
-      setMotors((current) =>
-        current.map((motor) =>
-          motor.id === activeMotorId
-            ? {
-                ...motor,
-                generation: {
-                  status: 'error',
-                  message:
-                    error instanceof Error
-                      ? error.message
-                      : 'Локальный DXF-сервис недоступен.',
-                },
-              }
-            : motor,
-        ),
-      );
-    }
-  };
-
-  const generateCabinet = async () => {
-    if (!cabinet.canExport) return;
-    const version = inputVersion;
-    setCabinetGeneration({ status: 'working' });
-    try {
-      const response = await fetch(`${DXF_API_URL}/generate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          motors: JSON.parse(inputVersion),
-          ruleFingerprint: cabinet.ruleFingerprint,
-        }),
-      });
-      const result = await response.json();
-      if (!response.ok || !result.downloadPath)
-        throw new Error(result.error || 'Не удалось собрать шкаф');
-      if (latestVersion.current !== version) return;
-      setCabinetGeneration({
+      setGeneration({
         status: 'success',
-        message: result.message,
+        message: result.message || 'DXF собран и проверен.',
         downloadUrl: `${DXF_API_URL}${result.downloadPath}`,
         drawings: result.drawings || [],
       });
     } catch (error) {
       if (latestVersion.current !== version) return;
-      setCabinetGeneration({
-        status: 'error',
-        message: error instanceof Error ? error.message : 'Ошибка генерации',
-      });
+      setGeneration({ status: 'error', message: error instanceof Error ? error.message : 'Ошибка генерации' });
     }
   };
+  const generateDxf = () => { if (activeMotorId) void generate(activeMotorId); };
+  const generateCabinet = () => { void generate(); };
 
   const downloadCalculation = () => {
     const url = URL.createObjectURL(
@@ -603,8 +533,8 @@ function CabinetApp({ user, project, workspace, onBack, onLogout }: { user: stri
                       className="flex w-full items-center gap-3 text-left"
                     >
                       <span className="motor-thumb l-block-gradient grid size-11 overflow-hidden rounded-xl">
-                        <img
-                          src="/assets/asynchronous-motor-v1.png"
+                        <Image width={320} height={320} unoptimized
+                          src="/assets/asynchronous-motor-v1.webp"
                           alt="Асинхронный электродвигатель"
                         />
                       </span>
@@ -652,9 +582,9 @@ function CabinetApp({ user, project, workspace, onBack, onLogout }: { user: stri
             </div>
             <div className="mt-5 space-y-3 border-t border-[#e4e4ed] pt-5">
               <h3 className="text-sm font-semibold">Схемы всего шкафа</h3>
-              {!engineering.ready && <p role="status" className="text-xs text-[#7669dc]">
+              {!engineering.ready && <output className="block text-xs text-[#7669dc]">
                 {engineering.error ? <>{engineering.error} <button className="underline" onClick={engineering.retry}>Повторить</button></> : 'Пересчитываю…'}
-              </p>}
+              </output>}
               <p className="text-xs leading-5 text-[#777786]">
                 Два отдельных документа по всем блокам поля: принципиальная
                 электрическая схема и схема внешних соединений. У каждого своя
@@ -734,11 +664,15 @@ function CabinetApp({ user, project, workspace, onBack, onLogout }: { user: stri
           }
           diagramRows={calculatedMotor?.main ? [calculatedMotor.main] : []}
           selectedMain={calculatedMotor?.main}
+          mainChoices={calculatedMotor?.mainChoices || []}
+          mainSchemeCode={activeMotor.mainSchemeCode || ''}
+          onMainSchemeChange={(code) => setMotors(current => current.map(motor => motor.id === activeMotor.id
+            ? { ...motor, mainSchemeCode: code || undefined, generation: { status: 'idle' } } : motor))}
           channels={calculatedMotor?.channels || []}
           optionalRows={optionalDiagram}
           missing={calculatedMotor?.errors || []}
           schemeCodes={schemeCodes}
-          generation={activeMotor.generation}
+          generation={activeMotor.generation.version === inputVersion ? activeMotor.generation : idleGeneration}
           onGenerate={generateDxf}
           calculationSummary={
             calculatedMotor && (
@@ -757,6 +691,7 @@ function CabinetApp({ user, project, workspace, onBack, onLogout }: { user: stri
                   ? {
                       ...motor,
                       state: initialQuestionnaireState,
+                      mainSchemeCode: undefined,
                       requested: false,
                       generation: { status: 'idle' },
                     }
@@ -768,11 +703,10 @@ function CabinetApp({ user, project, workspace, onBack, onLogout }: { user: stri
       )}
       {pendingDelete && (
         <div className="fixed inset-0 z-[70] grid place-items-center bg-[#1c1c29]/35 p-4 backdrop-blur-sm">
-          <section
-            role="dialog"
+          <dialog open
             aria-modal="true"
             aria-label={`Удалить блок ${pendingDelete.tag}`}
-            className="w-full max-w-sm rounded-[24px] bg-white p-6 shadow-[0_22px_70px_rgba(28,29,44,.28)]"
+            className="static m-0 w-full max-w-sm rounded-[24px] bg-white p-6 shadow-[0_22px_70px_rgba(28,29,44,.28)]"
           >
             <div className="flex items-start gap-3">
               <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#fff1ee] text-[#b45b45]">
@@ -803,7 +737,7 @@ function CabinetApp({ user, project, workspace, onBack, onLogout }: { user: stri
                 Удалить блок
               </Button>
             </div>
-          </section>
+          </dialog>
         </div>
       )}
     </main>
@@ -836,8 +770,8 @@ function BlockLibrary({ onAdd }: { onAdd: () => void }) {
       >
         <div className="flex items-start gap-3">
           <span className="motor-thumb l-block-gradient grid size-14 shrink-0 overflow-hidden rounded-2xl shadow-[0_8px_18px_rgba(119,103,255,.25)]">
-            <img
-              src="/assets/asynchronous-motor-v1.png"
+            <Image width={320} height={320} unoptimized
+              src="/assets/asynchronous-motor-v1.webp"
               alt="Асинхронный электродвигатель"
             />
           </span>
@@ -921,8 +855,8 @@ function Board({
                   title="Открыть опросник или перенести блок"
                   className="l-block-gradient absolute inset-1 flex cursor-grab flex-col items-center justify-center overflow-hidden rounded-md shadow-[0_5px_14px_rgba(119,103,255,.32)] transition hover:scale-[1.04] active:cursor-grabbing"
                 >
-                  <img
-                    src="/assets/asynchronous-motor-v1.png"
+                  <Image width={320} height={320} unoptimized
+                    src="/assets/asynchronous-motor-v1.webp"
                     alt=""
                     className="motor-board-image"
                   />
@@ -956,6 +890,9 @@ function QuestionnaireSheet({
   setRequested,
   diagramRows,
   selectedMain,
+  mainChoices,
+  mainSchemeCode,
+  onMainSchemeChange,
   channels,
   optionalRows,
   missing,
@@ -981,8 +918,11 @@ function QuestionnaireSheet({
   ) => void;
   requested: boolean;
   setRequested: (value: boolean) => void;
-  diagramRows: DiagramRow[];
-  selectedMain?: DiagramRow;
+  diagramRows: SchemeRow[];
+  selectedMain?: SchemeRow;
+  mainChoices: Array<{code: string; io: Record<string, number>; sourceRow: number}>;
+  mainSchemeCode: string;
+  onMainSchemeChange: (code: string) => void;
   channels: Channel[];
   optionalRows: OptionalRow[];
   missing: string[];
@@ -993,7 +933,6 @@ function QuestionnaireSheet({
   onReset: () => void;
   calculationSummary: ReactNode;
 }) {
-  let activeSheet = '';
   const [passportOpen, setPassportOpen] = useState(false);
   return (
     <div className="fixed inset-0 z-50 bg-[#1c1c29]/25 p-0 backdrop-blur-sm sm:p-5">
@@ -1029,9 +968,9 @@ function QuestionnaireSheet({
             </button>
           </div>
         </header>
-        <div role="status" className="px-5 py-2 text-xs text-[#7669dc]">
+        <output className="block px-5 py-2 text-xs text-[#7669dc]">
           {calculationError ? <>{calculationError} <button onClick={onRetry} className="underline">Повторить</button></> : calculationPending ? 'Пересчитываю…' : 'Расчёт обновлён'}
-        </div>
+        </output>
         <div className="grid flex-1 overflow-y-auto lg:grid-cols-[1.05fr_.95fr]">
           <section className="p-5 sm:p-8">
             <p className="text-xs font-semibold uppercase tracking-[.16em] text-[#7669dc]">
@@ -1045,9 +984,8 @@ function QuestionnaireSheet({
               <span className="font-mono text-xs">binds</span> в исходной ОЛ.
             </p>
             <div className="mt-7 space-y-5">
-              {groups.map((group) => {
-                const heading = group.sheet !== activeSheet;
-                activeSheet = group.sheet;
+              {groups.map((group, index) => {
+                const heading = group.sheet !== groups[index - 1]?.sheet;
                 return (
                   <div key={group.key}>
                     {heading && (
@@ -1092,6 +1030,9 @@ function QuestionnaireSheet({
               canExport={canExport}
               rows={diagramRows}
               selectedMain={selectedMain}
+              mainChoices={mainChoices}
+              mainSchemeCode={mainSchemeCode}
+              onMainSchemeChange={onMainSchemeChange}
               channels={channels}
               optionalRows={optionalRows}
               missing={missing}
@@ -1107,14 +1048,12 @@ function QuestionnaireSheet({
         <div
           className="fixed inset-0 z-[60] grid place-items-center bg-[#1c1c29]/30 p-4 backdrop-blur-sm"
           role="presentation"
-          onMouseDown={() => setPassportOpen(false)}
+          onMouseDown={(event) => { if (event.target === event.currentTarget) setPassportOpen(false); }}
         >
-          <section
-            role="dialog"
+          <dialog open
             aria-modal="true"
             aria-label={`Паспорт блока ${motorTag}`}
-            onMouseDown={(event) => event.stopPropagation()}
-            className="max-h-[calc(100vh-2rem)] w-full max-w-[530px] overflow-y-auto rounded-[24px] border border-white bg-[#fbfbfe] p-5 shadow-[0_22px_70px_rgba(28,29,44,.28)] sm:p-6"
+            className="static m-0 max-h-[calc(100vh-2rem)] w-full max-w-[530px] overflow-y-auto rounded-[24px] border border-white bg-[#fbfbfe] p-5 shadow-[0_22px_70px_rgba(28,29,44,.28)] sm:p-6"
           >
             <div className="mb-4 flex items-start justify-between gap-4">
               <div>
@@ -1134,7 +1073,7 @@ function QuestionnaireSheet({
               </button>
             </div>
             {calculationSummary}
-          </section>
+          </dialog>
         </div>
       )}
     </div>
@@ -1285,6 +1224,9 @@ function DiagramResult({
   canExport,
   rows,
   selectedMain,
+  mainChoices,
+  mainSchemeCode,
+  onMainSchemeChange,
   channels,
   optionalRows,
   missing,
@@ -1294,8 +1236,11 @@ function DiagramResult({
   onGenerate,
 }: {
   canExport: boolean;
-  rows: DiagramRow[];
-  selectedMain?: DiagramRow;
+  rows: SchemeRow[];
+  selectedMain?: SchemeRow;
+  mainChoices: Array<{code: string; io: Record<string, number>; sourceRow: number}>;
+  mainSchemeCode: string;
+  onMainSchemeChange: (code: string) => void;
   channels: Channel[];
   optionalRows: OptionalRow[];
   missing: string[];
@@ -1311,6 +1256,18 @@ function DiagramResult({
     schemeCodes.length > 0;
   return (
     <div className="mt-6 space-y-6">
+      {(mainChoices.length > 1 || mainSchemeCode) && (
+        <label className="block text-sm font-medium text-[#40404a]">
+          Основная схема
+          <select aria-label="Основная схема" className="mt-2 w-full rounded-xl border border-[#dcd8ff] bg-white p-3 text-sm"
+            value={mainSchemeCode} onChange={event => onMainSchemeChange(event.target.value)}>
+            <option value="">Автоматический подбор</option>
+            {mainChoices.map(choice => <option key={`${choice.code}:${choice.sourceRow}`} value={choice.code}>
+              {choice.code} · {Object.entries(choice.io).filter(([, count]) => count > 0).map(([code, count]) => `${code} × ${count}`).join(', ')}
+            </option>)}
+          </select>
+        </label>
+      )}
       {requested && missing.length > 0 ? (
         <Notice>Не выбрано: {missing.join(', ')}.</Notice>
       ) : requested && !rows.length ? (
@@ -1428,7 +1385,7 @@ function TraceSection({
 }: {
   title: string;
   caption: string;
-  entries: DecisionTraceEntry[];
+  entries: TraceEntry[];
   empty: string;
 }) {
   return (
@@ -1467,7 +1424,7 @@ function DecisionTrace({
   errors: string[];
   warnings: string[];
 }) {
-  const issues: DecisionTraceEntry[] = [
+  const issues: TraceEntry[] = [
     ...errors.map((detail, index) => ({
       id: `error:${index}:${detail}`,
       title: 'Требует заполнения или исправления',

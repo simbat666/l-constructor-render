@@ -3,13 +3,20 @@ set -euo pipefail
 
 python3 scripts/local_cad_api.py &
 cad_pid=$!
+web_pid=
 
 cleanup() {
   kill "$cad_pid" 2>/dev/null || true
+  if [[ -n "$web_pid" ]]; then
+    kill "$web_pid" 2>/dev/null || true
+  fi
 }
-trap cleanup EXIT INT TERM
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
-npm run start -- --hostname 0.0.0.0 --port "${PORT:-10000}" &
+# Keep the actual server PID so cleanup also stops the web process.
+./node_modules/.bin/vinext start --hostname 0.0.0.0 --port "${PORT:-10000}" &
 web_pid=$!
 
 while kill -0 "$cad_pid" 2>/dev/null && kill -0 "$web_pid" 2>/dev/null; do
