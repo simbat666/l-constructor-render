@@ -10,6 +10,7 @@ library first.
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import hashlib
 import re
@@ -18,6 +19,7 @@ from pathlib import Path
 
 import ezdxf
 from ezdxf import bbox, transform, xref
+from ezdxf.enums import TextEntityAlignment
 from ezdxf.math import Matrix44
 
 
@@ -34,6 +36,10 @@ BOTTOM = 65.0
 PROFILES = ROOT / 'data' / 'drawing-profiles.json'
 FIELD_CONTRACT = ROOT / 'data' / 'cad-field-contract.json'
 TEMPLATE_CONTRACTS = ROOT / 'data' / 'cad-template-contracts'
+PLC_CATALOG = ROOT / 'data' / 'plc-catalog.json'
+PART_ORDER = ('power', 'control', 'feedback')
+PART_TITLES = {'power': 'Силовая цепь', 'control': 'Цепь управления',
+               'feedback': 'Обратная связь', 'other': 'Прочие цепи'}
 
 # A marker is deliberately just a marker: the layer contract determines its
 # engineering meaning.  For example, ``#1`` on layer QF is a circuit breaker,
@@ -46,6 +52,57 @@ FORMAT_PREFIX = re.compile(r'^\\[^;]*;')
 def mtext_plain(entity):
     """Read just the visible designation text, retaining source formatting."""
     return FORMAT_PREFIX.sub('', entity.text).strip()
+
+
+def place_terminal_label(code, field, entity, modelspace, value, module_ref=None):
+    """Center a selected terminal on its source-locked conductor and box."""
+    box = modelspace.doc.entitydb.get(field.get('boxHandle'))
+    line = modelspace.doc.entitydb.get(field.get('lineHandle'))
+    if (box is None or box.dxftype() != 'LWPOLYLINE' or box not in modelspace
+            or line is None or line.dxftype() != 'LINE' or line not in modelspace):
+        raise ValueError(f'{code}: нет проверенной геометрии клеммы {field["role"]}')
+    points = list(box.get_points('xy'))
+    if len(points) != 4:
+        raise ValueError(f'{code}: изменилась рамка клеммы {field["role"]}')
+    left, right = min(p[0] for p in points), max(p[0] for p in points)
+    low, high = min(p[1] for p in points), max(p[1] for p in points)
+    axis = (left + right) / 2
+    if (abs(right - left - 5) > .01 or abs(high - low - 4.902) > .01
+            or abs(line.dxf.start.x - axis) > .01 or abs(line.dxf.end.x - axis) > .01
+            or not (left < entity.dxf.insert.x < right and low < entity.dxf.insert.y < high)):
+        raise ValueError(f'{code}: линия клеммы {field["role"]} не совпала с шаблоном')
+    if field['role'].startswith('plc.'):
+        # A four-character pin such as Q1-1 needs more than the original 5 mm.
+        # Adjacent PLC boxes have 11.24 mm or more between their axes.
+        half_width = 4.5
+        box.set_points([(axis - half_width if x < axis else axis + half_width, y)
+                        for x, y in points], format='xy')
+    else:
+        half_width = 2.5
+    entity.text = value
+    entity.dxf.insert = (axis, (low + high) / 2, entity.dxf.insert.z)
+    entity.dxf.attachment_point = 5  # middle center, directly on conductor axis
+    entity.dxf.width = 0  # no automatic wrapping inside the old narrow MTEXT width
+    entity.dxf.char_height = 1.8
+    # ezdxf may retain the source MTEXT's old glyph extents after replacing
+    # its content. Measure a fresh temporary entity with the same font.
+    probe = modelspace.add_mtext(value, dxfattribs={
+        'style': entity.dxf.style, 'char_height': entity.dxf.char_height,
+        'width': 0, 'attachment_point': 5,
+    })
+    measured = bbox.extents([probe], fast=True)
+    modelspace.delete_entity(probe)
+    if measured.has_data and measured.size.x > 2 * half_width - .5:
+        entity.dxf.char_height *= (2 * half_width - .5) / measured.size.x
+    if entity.dxf.char_height < 1.1:
+        raise ValueError(f'{code}: надпись {value} не помещается в клемме {field["role"]}')
+    if module_ref:
+        owner = modelspace.add_text(module_ref, dxfattribs={
+            'layer': entity.dxf.layer, 'height': 1.2, 'style': entity.dxf.style,
+        })
+        owner.set_placement((axis, high + 1.5), align=TextEntityAlignment.MIDDLE_CENTER)
+        return owner.dxf.handle
+    return None
 
 
 def load_field_contract(path: Path = FIELD_CONTRACT):
@@ -147,7 +204,7 @@ def apply_template_contract(code, modelspace, source_sha256, instance, counters)
     if not path.is_file():
         return []
     contract = json.loads(path.read_text(encoding='utf-8'))
-    if contract.get('schemaVersion') != 1 or contract.get('sourceSha256') != source_sha256:
+    if contract.get('schemaVersion') != 2 or contract.get('sourceSha256') != source_sha256:
         raise ValueError(f'Изменилась версия DXF {code}; требуется повторная проверка полей')
     fields = contract.get('fields')
     if not isinstance(fields, list) or len({f['handle'] for f in fields}) != len(fields):
@@ -159,20 +216,45 @@ def apply_template_contract(code, modelspace, source_sha256, instance, counters)
             raise ValueError(f'Поле {code}:{field["handle"]} не совпало с проверенным шаблоном')
         entities[field['handle']] = entity
 
-    input_family = contract.get('inputFamily')
-    output_family = contract.get('outputFamily')
-    if input_family not in ('DI24-NPN', 'DI24-PNP') or output_family not in ('DOR-NO', 'DOT-PNP'):
-        raise ValueError(f'{code}: не задан проверенный тип входа и выхода')
+    catalog = json.loads(PLC_CATALOG.read_text(encoding='utf-8'))
+    bindings = catalog.get('templateFields', {}).get(code, [])
+    by_role = {item['role']: item for item in bindings}
+    plc_fields = [field for field in fields if field['role'].startswith('plc.')]
+    if len(by_role) != len(plc_fields) or {field['role'] for field in plc_fields} != set(by_role):
+        raise ValueError(f'{code}: таблица полей CAD не соответствует шаблону')
+    for field in plc_fields:
+        if by_role[field['role']]['marker'] != field['text']:
+            raise ValueError(f'{code}: ключ {field["role"]} в Excel не совпал с DXF')
+    signals = contract['signals']
     channels = instance.get('channels', [])
-    di = [item for item in channels if item.get('family') == input_family]
-    do = [item for item in channels if item.get('family') == output_family]
-    expected_output_terminals = 2 if output_family == 'DOR-NO' else 1
+    di = [item for item in channels if item.get('family') == signals['di']]
+    do = [item for item in channels if item.get('family') == signals['do']]
+    expected_output_terminals = 2 if 'plc.do.2' in by_role else 1
     if len(di) != 1 or len(do) != 1 or len(do[0].get('terminals', [])) != expected_output_terminals:
-        raise ValueError(f'{code}: требуется один {input_family} и один {output_family}')
+        raise ValueError(f'{code}: требуется один {signals["di"]} и один {signals["do"]}')
+    for channel in (di[0], do[0]):
+        module_ref = channel.get('deviceRef', 'PLC') != 'PLC'
+        common = channel.get('commonDesignation')
+        common_key = channel.get('commonKey') or ('#' + common if common else None)
+        if common and common_key != '#' + common:
+            raise ValueError(f'{code}: обозначение общего вывода не соответствует выбранной строке выводов')
+        matched_rows = [option for option in catalog['modulePinOptions' if module_ref else 'pinOptions']
+                        if option['code'] == channel['family']
+                        and option['terminals'] == channel.get('terminals')
+                        and option['commonDesignation'] == common
+                        and option['commonKey'] == common_key]
+        if len(matched_rows) != 1 or channel.get('address') != matched_rows[0]['terminals'][0]:
+            raise ValueError(f'{code}: пара вывод/GND для {channel["family"]} отсутствует в таблице выводов')
     if not di[0].get('commonDesignation') or not di[0].get('address'):
-        raise ValueError(f'{code}: не подтверждены общий вывод и клемма {input_family}')
-    if output_family == 'DOT-PNP' and not do[0].get('commonDesignation'):
-        raise ValueError(f'{code}: не подтверждён общий вывод {output_family}')
+        raise ValueError(f'{code}: не подтверждены общий вывод и клемма {signals["di"]}')
+    if 'plc.do.common' in by_role and not do[0].get('commonDesignation'):
+        raise ValueError(f'{code}: не подтверждён общий вывод {signals["do"]}')
+    for role, channel in (('plc.di', di[0]), ('plc.common', di[0]), ('plc.do.1', do[0])):
+        if by_role[role]['signal'] != channel['family']:
+            raise ValueError(f'{code}: строка {role} ссылается на другой тип сигнала')
+    for role in ('plc.do.2', 'plc.do.common'):
+        if role in by_role and by_role[role]['signal'] != do[0]['family']:
+            raise ValueError(f'{code}: строка {role} ссылается на другой тип сигнала')
     head_rules = instance.get('cadHeadRules')
     if not isinstance(head_rules, list) or (contract.get('requireDiagramHead') and len(head_rules) != 3):
         raise ValueError(f'{code}: нет трёх правил diagram head из ОЛ')
@@ -193,21 +275,25 @@ def apply_template_contract(code, modelspace, source_sha256, instance, counters)
         'device.qf.contact': f"QF{numbers['QF']}.1",
         'device.km.main': f"KM{numbers['KM']}",
         'device.km.contact': f"KM{numbers['KM']}.1",
-        'plc.inputCommon': di[0]['commonDesignation'],
-        'plc.di': str(di[0]['address']),
-        'plc.do.1': str(do[0]['terminals'][0]),
     }
-    if output_family == 'DOR-NO':
-        values['plc.do.2'] = str(do[0]['terminals'][1])
-    else:
-        values['plc.outputCommon'] = do[0]['commonDesignation']
+    for role, binding in by_role.items():
+        channel = di[0] if role in ('plc.di', 'plc.common') else do[0]
+        source_column = binding['valueFrom']
+        if source_column == 'CND_COM':
+            value = channel.get('commonDesignation')
+        else:
+            terminal_index = int(source_column.rsplit(' ', 1)[1]) - 1
+            value = channel['terminals'][terminal_index] if terminal_index < len(channel['terminals']) else None
+        if not value:
+            raise ValueError(f'{code}: для роли {role} нет значения {source_column} в выбранной строке ПЛК')
+        values[role] = str(value)
     module_fields = {}
     if di[0].get('deviceRef', 'PLC') != 'PLC':
-        module_fields.update({'plc.inputCommon': di[0]['deviceRef'], 'plc.di': di[0]['deviceRef']})
+        module_fields.update({'plc.common': di[0]['deviceRef'], 'plc.di': di[0]['deviceRef']})
     if do[0].get('deviceRef', 'PLC') != 'PLC':
         module_fields.update({role: do[0]['deviceRef'] for role in
-                              (('plc.do.1', 'plc.do.2') if output_family == 'DOR-NO'
-                               else ('plc.do.1', 'plc.outputCommon'))})
+                              (('plc.do.1', 'plc.do.2') if 'plc.do.2' in by_role
+                               else ('plc.do.1', 'plc.do.common'))})
     for field in fields:
         key = field.get('diagramKey')
         if not key:
@@ -231,16 +317,23 @@ def apply_template_contract(code, modelspace, source_sha256, instance, counters)
             if not isinstance(value, str) or not value.strip() or len(value) > 100 or any(ord(c) < 32 for c in value):
                 raise ValueError(f'{code}: некорректное значение {key}')
             values[field['role']] = value.strip()
+        else:
+            # These OL questionnaire answers are optional. An empty answer is
+            # an empty label, not an unresolved CAD template marker.
+            values[field['role']] = ''
     trace = []
     for field in fields:
         before = field['text']
         module_ref = module_fields.get(field['role'])
-        after = before if module_ref else values.get(field['role'], before)
-        unresolved = bool(module_ref) or (field['role'].startswith('header.') and field['role'] not in values)
+        after = values.get(field['role'], before)
+        unresolved = field['role'].startswith('header.') and field['role'] not in values
         if not unresolved and field['role'] not in values:
             raise ValueError(f'{code}: неизвестная роль поля {field["role"]}')
         entity = entities[field['handle']]
-        if after != before:
+        owner_handle = None
+        if field['role'].startswith(('plc.', 'terminal.')):
+            owner_handle = place_terminal_label(code, field, entity, modelspace, after, module_ref)
+        elif after != before:
             entity.text = entity.text.replace(before, after)
         if field.get('offsetY'):
             position = entity.dxf.insert
@@ -250,8 +343,9 @@ def apply_template_contract(code, modelspace, source_sha256, instance, counters)
             'before': before, 'after': after,
             'placeholderHandle': field['handle'],
             'offsetY': field.get('offsetY', 0),
-            'status': 'unresolved' if unresolved else 'applied',
+            'status': 'unresolved' if unresolved else 'empty-optional' if after == '' else 'applied',
             'assignedModule': module_ref,
+            'ownerHandle': owner_handle,
             'ruleSource': (f"diagram head:{head_by_key[field['diagramKey']]['sourceRow']}"
                            if field.get('diagramKey') in head_by_key else
                            (instance.get('cadFieldSources') or {}).get(
@@ -259,6 +353,47 @@ def apply_template_contract(code, modelspace, source_sha256, instance, counters)
                            if field.get('diagramKey') and contract.get('headerSource') == 'questionnaire' else None),
         })
     return trace
+
+
+def merge_repeated_commons(code, modelspace, applied_fields, visible_commons, instance_id):
+    """Keep one complete, isolated common branch per device/common on a page.
+
+    The source-locked contract names the exact label, box, vertical conductor,
+    and lower endpoint.  A duplicate is removed as a whole; other wires in the
+    fragment are never shortened or inferred from nearby text.
+    """
+    path = TEMPLATE_CONTRACTS / f'{code}.json'
+    contract = json.loads(path.read_text(encoding='utf-8'))
+    branches = contract.get('commonBranches', {})
+    removed = 0
+    common_fields = [field for field in applied_fields if field['fieldId'] in branches]
+    # A native #GND3 branch is clearer than a #GND1 branch renamed to GND3.
+    # Keep the native branch when two different signals share this common.
+    common_fields.sort(key=lambda field: field['before'] != '#' + field['after'])
+    for field in common_fields:
+        role = field['fieldId']
+        module_ref = field.get('assignedModule')
+        key = (module_ref or 'PLC', field['after'])
+        if key not in visible_commons:
+            visible_commons[key] = {'sourceCode': code, 'role': role, 'instanceId': instance_id}
+            continue
+        handles = branches[role]
+        if len(handles) != 5 or handles[0] != field['placeholderHandle']:
+            raise ValueError(f'{code}: неполная карта ветви {role}')
+        expected = ('MTEXT', 'LWPOLYLINE', 'LINE', 'HATCH', 'CIRCLE')
+        entities = [modelspace.doc.entitydb.get(handle) for handle in handles]
+        if any(entity is None or entity.dxftype() != kind or entity not in modelspace
+               for entity, kind in zip(entities, expected)):
+            raise ValueError(f'{code}: изменилась геометрия ветви {role}')
+        for entity in entities:
+            modelspace.delete_entity(entity)
+        if field.get('ownerHandle'):
+            modelspace.delete_entity(modelspace.doc.entitydb[field['ownerHandle']])
+        field['status'] = 'shared-common'
+        field['removedEntityHandles'] = handles
+        field['sharedWith'] = visible_commons[key]
+        removed += 1
+    return removed
 
 
 def parse_args() -> argparse.Namespace:
@@ -317,6 +452,22 @@ def load_and_validate(selected: list[tuple[str, Path]], profile=None):
             details = "; ".join(error.message for error in audit.errors)
             raise ValueError(f"DXF-блок {code} не проходит аудит: {details}")
         modelspace = document.modelspace()
+        source_sha256 = hashlib.sha256(path.read_bytes()).hexdigest()
+        contract_path = TEMPLATE_CONTRACTS / f'{code}.json'
+        if contract_path.is_file():
+            contract = json.loads(contract_path.read_text(encoding='utf-8'))
+            if contract.get('sourceSha256') != source_sha256:
+                raise ValueError(f'Изменилась версия DXF {code}; требуется повторная проверка полей')
+            nonhatch = bbox.extents((entity for entity in modelspace if entity.dxftype() != 'HATCH'), fast=True)
+            for handle in contract.get('detachedHatches', []):
+                entity = document.entitydb.get(handle)
+                if entity is None or entity.dxftype() != 'HATCH':
+                    raise ValueError(f'{code}: не найден проверенный удалённый штриховой объект {handle}')
+                box = bbox.extents([entity], fast=True)
+                if not box.has_data or not (box.extmax.x < nonhatch.extmin.x - 5 or box.extmin.x > nonhatch.extmax.x + 5
+                                            or box.extmax.y < nonhatch.extmin.y - 5 or box.extmin.y > nonhatch.extmax.y + 5):
+                    raise ValueError(f'{code}: штриховой объект {handle} больше не отделён от схемы')
+                modelspace.delete_entity(entity)
         extents = bbox.extents(modelspace, fast=True)
         if not extents.has_data:
             raise ValueError(f"DXF-блок {code} не содержит геометрии")
@@ -332,32 +483,222 @@ def load_and_validate(selected: list[tuple[str, Path]], profile=None):
             elif (extents.extmin.y - profile['sourceOriginY'] + profile['verticalOffset'] < profile['bottom']
                   or extents.extmax.y - profile['sourceOriginY'] + profile['verticalOffset'] > profile['top']):
                 raise ValueError(f'Неверная вертикальная привязка {code}: нужен контракт координат шаблона')
-        prepared.append((code, document, modelspace, extents, hashlib.sha256(path.read_bytes()).hexdigest()))
+        prepared.append((code, document, modelspace, extents, source_sha256))
     return prepared
+
+
+def validate_circuit_parts(code, modelspace, contract):
+    """Check the source-locked entity partition and every crossing conductor."""
+    parts = contract.get('circuitParts')
+    if not isinstance(parts, dict):
+        return None
+    groups = {kind: parts.get(kind) for kind in PART_ORDER}
+    if any(not isinstance(handles, list) or not handles or len(handles) != len(set(handles))
+           for handles in groups.values()):
+        raise ValueError(f'{code}: неполная карта частей схемы')
+    owner = {}
+    for kind, handles in groups.items():
+        for handle in handles:
+            if handle in owner:
+                raise ValueError(f'{code}: объект {handle} назначен двум частям')
+            owner[handle] = kind
+    actual = {entity.dxf.handle for entity in modelspace}
+    if set(owner) != actual:
+        raise ValueError(f'{code}: карта частей не покрывает DXF: {sorted(actual ^ set(owner))}')
+    expected_roles = {
+        'terminal.xt1.1': 'power', 'terminal.xt1.2': 'power',
+        'device.qf.main': 'power', 'device.km.contact': 'power',
+        'device.qf.contact': 'feedback', 'plc.common': 'feedback', 'plc.di': 'feedback',
+        'device.km.main': 'control', 'plc.do.1': 'control', 'plc.do.2': 'control',
+        'plc.do.common': 'control',
+    }
+    for field in contract['fields']:
+        expected = expected_roles.get(field['role'], 'power')
+        if owner[field['handle']] != expected:
+            raise ValueError(f"{code}: поле {field['role']} попало не в {expected}")
+    shared_endpoints = {}
+    for entity in modelspace.query('LINE'):
+        for endpoint in ('start', 'end'):
+            point = getattr(entity.dxf, endpoint)
+            key = (round(point.x, 5), round(point.y, 5))
+            shared_endpoints.setdefault(key, []).append((owner[entity.dxf.handle], entity.dxf.handle, endpoint))
+    crossings = {key: items for key, items in shared_endpoints.items()
+                 if len({item[0] for item in items}) > 1}
+    connections = parts.get('interpartConnections', [])
+    if not isinstance(connections, list) or len(connections) != len(crossings):
+        raise ValueError(f'{code}: не все межчастные соединения описаны')
+    seen = set()
+    for connection in connections:
+        if set(connection) != {'netId', 'feedback', 'control', 'at'}:
+            raise ValueError(f'{code}: неверная карта межчастного соединения')
+        at = connection['at']
+        if not isinstance(at, list) or len(at) != 2:
+            raise ValueError(f'{code}: неверная точка соединения')
+        key = tuple(round(float(value), 5) for value in at)
+        if key not in crossings or key in seen:
+            raise ValueError(f'{code}: точка соединения не совпала с DXF')
+        seen.add(key)
+        recorded = {(kind, item['handle'], item['endpoint'])
+                    for kind in ('feedback', 'control') for item in (connection[kind],)}
+        if set(crossings[key]) != recorded or not isinstance(connection['netId'], str) or not connection['netId']:
+            raise ValueError(f'{code}: провод в точке {key} не совпал с контрактом')
+    return groups, connections
+
+
+def prepare_grouped_electrical(prepared, instances):
+    """Mark complete occurrences once, then copy their verified circuit parts."""
+    if len(prepared) != len(instances):
+        raise ValueError('Число схем не совпадает с числом блоков расчёта')
+    counters = {}
+    field_contract = load_field_contract()
+    grouped = []
+    for source_index, (source, instance) in enumerate(zip(prepared, instances)):
+        code, document, modelspace, extents, source_sha = source
+        contract_path = TEMPLATE_CONTRACTS / f'{code}.json'
+        contract = json.loads(contract_path.read_text(encoding='utf-8')) if contract_path.is_file() else None
+        partition = validate_circuit_parts(code, modelspace, contract) if contract else None
+        if contract:
+            placement = template_placement(code, modelspace)
+            fields = apply_template_contract(code, modelspace, source_sha, instance, counters)
+        else:
+            placement = None
+            fields = renumber_designations(modelspace, counters, field_contract)
+        if not partition:
+            grouped.append((code, document, modelspace, extents, source_sha, {
+                'partKind': 'other', 'instance': instance, 'fields': fields,
+                'sourceIndex': source_index, 'preparameterized': True,
+            }))
+            continue
+        groups, connections = partition
+        for kind in PART_ORDER:
+            part_doc = copy.deepcopy(document)
+            part_model = part_doc.modelspace()
+            handles = set(groups[kind])
+            handles.update(field['ownerHandle'] for field in fields
+                           if field.get('ownerHandle') and field['placeholderHandle'] in handles)
+            for entity in list(part_model):
+                if entity.dxf.handle not in handles:
+                    part_model.delete_entity(entity)
+            part_extents = bbox.extents(part_model, fast=True)
+            if not part_extents.has_data:
+                raise ValueError(f'{code}: пустая часть {kind}')
+            part_fields = [field.copy() for field in fields if field['placeholderHandle'] in handles]
+            part_ports = [dict(netId=connection['netId'], at=connection['at'], peerPart=(
+                'control' if kind == 'feedback' else 'feedback')) for connection in connections
+                if kind in ('feedback', 'control')]
+            grouped.append((code, part_doc, part_model, part_extents, source_sha, {
+                'partKind': kind, 'instance': instance, 'fields': part_fields,
+                'sourceIndex': source_index, 'preparameterized': True,
+                'anchorSourceY': placement['anchor'].y,
+                'anchorTargetY': placement['y'], 'ports': part_ports,
+            }))
+    # Pack one circuit kind at a time; keep cabinet block order within each kind.
+    return sorted(grouped, key=lambda item: (PART_ORDER.index(item[5]['partKind'])
+                                              if item[5]['partKind'] in PART_ORDER else len(PART_ORDER),
+                                              item[5]['sourceIndex']))
+
+
+def source_layout_width(source):
+    """Return the width reserved by this source or complete block."""
+    meta = source[5] if len(source) > 5 else {}
+    if meta.get('groupWidth') is not None:
+        return meta['groupWidth']
+    width = source[3].size.x + (20 if meta.get('ports') else 0)
+    return width
+
+
+def source_anchored(source, profile):
+    if not profile:
+        return False
+    if len(source) > 5 and source[5].get('anchorSourceY') is not None:
+        return True
+    return bool(template_placement(source[0], source[2]))
+
+
+def page_group_widths(page):
+    """Return one width per layout unit, not one width per circuit part."""
+    widths = []
+    seen = set()
+    for index, source in enumerate(page):
+        meta = source[5] if len(source) > 5 else {}
+        if meta.get('groupWidth') is not None:
+            key = ('group', meta.get('sourceIndex'))
+        else:
+            key = ('item', index)
+        if key in seen:
+            continue
+        seen.add(key)
+        widths.append(source_layout_width(source))
+    return widths
 
 
 def split_pages(prepared, profile=None):
     pages, current, used_width = [], [], 0.0
     available_width = profile['right'] - profile['left'] if profile else RIGHT - LEFT
-    for source in prepared:
-        if profile and template_placement(source[0], source[2]):
-            if current:
-                pages.append(current)
-                current, used_width = [], 0.0
-            pages.append([source])
-            continue
-        width = source[3].size.x
+    index = 0
+    while index < len(prepared):
+        source = prepared[index]
+        meta = source[5] if len(source) > 5 else {}
+        group_index = meta.get('sourceIndex') if meta.get('groupWidth') is not None else None
+        group = [source]
+        index += 1
+        while index < len(prepared):
+            candidate = prepared[index]
+            candidate_meta = candidate[5] if len(candidate) > 5 else {}
+            if group_index is None or candidate_meta.get('sourceIndex') != group_index:
+                break
+            group.append(candidate)
+            index += 1
+        anchored = source_anchored(group[0], profile)
+        current_meta = current[0][5] if current and len(current[0]) > 5 else {}
+        if current and (anchored != source_anchored(current[0], profile)
+                        or meta.get('partKind') != current_meta.get('partKind')):
+            pages.append(current)
+            current, used_width = [], 0.0
+        width = source_layout_width(group[0])
         gap = profile['gap'] if profile else 0
         if current and used_width + gap + width > available_width + 0.001:
             pages.append(current)
             current, used_width = [], 0.0
         if current:
             used_width += gap
-        current.append(source)
+        current.extend(group)
         used_width += width
     if current:
         pages.append(current)
     return pages
+
+
+def add_module_schedule(modelspace, page_x, module, instances):
+    """Show calculated module assignments without claiming a verified module schematic."""
+    rows = []
+    for instance in instances:
+        for channel in instance.get('channels', []):
+            if channel.get('deviceRef') != module['ref']:
+                continue
+            terminals = channel.get('terminals')
+            if not isinstance(terminals, list) or not terminals or not all(isinstance(t, str) and t for t in terminals):
+                raise ValueError(f"{module['ref']}: не заданы назначенные клеммы канала")
+            rows.append((instance.get('tag', ''), channel.get('family', ''), ', '.join(terminals),
+                         channel.get('commonDesignation') or '—'))
+    if not rows:
+        raise ValueError(f"{module['ref']}: лист модуля без назначенных сигналов")
+    if len(rows) > 24:
+        raise ValueError(f"{module['ref']}: назначения не помещаются на лист A3")
+    def label(value, x, y, height=2.5):
+        modelspace.add_text(str(value), dxfattribs={'insert': (page_x + x, y), 'height': height,
+                                                    'layer': 'L-MODULE-SCHEDULE'})
+    label(f"ДОП. МОДУЛЬ {module['ref']} / {module['brand']} {module['model']}", 55, 271, 3.5)
+    label('НАЗНАЧЕННЫЕ ВХОДЫ И ВЫХОДЫ / ДЛЯ СВЕРКИ', 55, 258, 2.5)
+    label('Блок', 55, 244)
+    label('Сигнал', 102, 244)
+    label(f"Клеммы {module['ref']}", 218, 244)
+    label('Общий', 325, 244)
+    for index, (tag, family, terminals, common) in enumerate(rows):
+        y = 232 - index * 7
+        for value, x in ((tag, 55), (family, 102), (terminals, 218), (common, 325)):
+            label(value, x, y)
+    label('Клеммы модуля: тестовые данные каталога, требуется сверка с паспортом.', 55, 48, 2.0)
 
 
 def add_frame(target, profile, page_index, page_count, page_x):
@@ -392,7 +733,7 @@ def add_frame(target, profile, page_index, page_count, page_x):
 
 
 def assemble(pages, output: Path, instances=None, profile=None, parameter_trace=None, drawing_kind=None,
-             module_sheets=None) -> None:
+             module_sheets=None, connection_trace=None) -> None:
     target = ezdxf.new("R2018", setup=True)
     target.header["$INSUNITS"] = 4  # millimetres; source library uses mm
     target_msp = target.modelspace()
@@ -402,6 +743,12 @@ def assemble(pages, output: Path, instances=None, profile=None, parameter_trace=
     module_sheets = module_sheets or []
     if module_sheets and (not profile or drawing_kind != 'electrical'):
         raise ValueError('Листы модулей допустимы только в принципиальном комплекте с рамкой')
+    part_pages = {}
+    for index, page in enumerate(pages):
+        for source in page:
+            if len(source) > 5:
+                meta = source[5]
+                part_pages[(meta['sourceIndex'], meta['partKind'])] = index + 1
     all_pages = pages + [[] for _ in module_sheets]
     for page_index, page in enumerate(all_pages):
         page_x = page_index * (PAGE_WIDTH + PAGE_GAP)
@@ -409,22 +756,37 @@ def assemble(pages, output: Path, instances=None, profile=None, parameter_trace=
             add_frame(target, profile, page_index, len(all_pages), page_x)
         if page_index >= len(pages):
             module = module_sheets[page_index - len(pages)]
-            target_msp.add_text(
-                f"ДОП. МОДУЛЬ {module['ref']} / {module['brand']} {module['model']} / DRAFT",
-                dxfattribs={'insert': (page_x + 40, 278), 'height': 2.0})
-            target_msp.add_text(
-                'Геометрия и клеммы модуля не заданы в CAD-шаблоне.',
-                dxfattribs={'insert': (page_x + 40, 268), 'height': 2.0})
+            add_module_schedule(target_msp, page_x, module, instances or [])
             continue
         cursor_x = page_x + (profile['left'] if profile else LEFT)
-        for code, source_doc, source_msp, extents, source_sha256 in page:
+        visible_commons = {}
+        active_group = None
+        group_cursor_x = None
+        group_width = None
+        for source_index_in_page, source in enumerate(page):
+            code, source_doc, source_msp, extents, source_sha256 = source[:5]
+            meta = source[5] if len(source) > 5 else {}
+            grouped = meta.get('groupWidth') is not None
+            group_key = (('group', meta.get('sourceIndex')) if grouped
+                         else ('item', source_index_in_page))
+            if group_key != active_group:
+                active_group = group_key
+                group_cursor_x = cursor_x
+                group_width = meta.get('groupWidth') if grouped else None
             occurrence += 1
-            instance = instances[occurrence - 1] if instances else {"tag": "", "id": str(occurrence)}
-            placement = template_placement(code, source_msp) if profile else None
-            if (TEMPLATE_CONTRACTS / f'{code}.json').is_file():
+            instance = meta.get('instance') or (instances[occurrence - 1] if instances else {"tag": "", "id": str(occurrence)})
+            placement = (template_placement(code, source_msp)
+                         if profile and meta.get('anchorSourceY') is None else None)
+            if meta.get('preparameterized'):
+                applied_fields = meta['fields']
+                shared_count = (merge_repeated_commons(code, source_msp, applied_fields, visible_commons, instance['id'])
+                                if (TEMPLATE_CONTRACTS / f'{code}.json').is_file() else 0)
+            elif (TEMPLATE_CONTRACTS / f'{code}.json').is_file():
                 applied_fields = apply_template_contract(code, source_msp, source_sha256, instance, designation_counters)
+                shared_count = merge_repeated_commons(code, source_msp, applied_fields, visible_commons, instance['id'])
             else:
                 applied_fields = renumber_designations(source_msp, designation_counters, field_contract)
+                shared_count = 0
             if parameter_trace is not None:
                 for field in applied_fields:
                     parameter_trace.append({
@@ -432,20 +794,66 @@ def assemble(pages, output: Path, instances=None, profile=None, parameter_trace=
                         'drawingKind': drawing_kind,
                         'instanceId': instance['id'],
                         'sourceCode': code,
+                        'sheetNumber': page_index + 1,
+                        **({'circuitPart': meta['partKind']} if meta.get('partKind') else {}),
                     })
-            if placement:
-                dx = page_x + placement['x'] - placement['anchor'].x
+            current_extents = bbox.extents(source_msp, fast=True)
+            if not current_extents.has_data:
+                raise ValueError(f'{code}: после объединения общих выводов нет геометрии')
+            if grouped:
+                dx = group_cursor_x + meta['sourceOffsetX'] - current_extents.extmin.x
+                dy = meta['anchorTargetY'] - meta['anchorSourceY']
+            elif meta.get('anchorSourceY') is not None:
+                dx = cursor_x - current_extents.extmin.x
+                dy = meta['anchorTargetY'] - meta['anchorSourceY']
+            elif placement:
+                dx = cursor_x - current_extents.extmin.x
                 dy = placement['y'] - placement['anchor'].y
             else:
-                dx = cursor_x - extents.extmin.x
-                dy = -profile['sourceOriginY'] + profile['verticalOffset'] if profile else TOP - extents.extmax.y
+                dx = cursor_x - current_extents.extmin.x
+                dy = -profile['sourceOriginY'] + profile['verticalOffset'] if profile else TOP - current_extents.extmax.y
             log = transform.inplace(source_msp, Matrix44.translate(dx, dy, 0))
             if len(log):
                 raise ValueError(f"Не все сущности {code} удалось переместить: {list(log)}")
             xref.load_modelspace(source_doc, target, conflict_policy=xref.ConflictPolicy.XREF_PREFIX)
+            for port in meta.get('ports', []):
+                peer_page = part_pages.get((meta['sourceIndex'], port['peerPart']))
+                if peer_page is None:
+                    raise ValueError(f'{code}: нет листа для соединения {port["netId"]}')
+                x, y = port['at'][0] + dx, port['at'][1] + dy
+                net_name = f"NET-{meta['sourceIndex'] + 1}"
+                # Parts of one motor are kept on one sheet whenever possible.
+                # A same-sheet connection is already drawn by the source wire;
+                # only a real cross-sheet connection gets a NET reference.
+                if peer_page != page_index + 1:
+                    target_msp.add_circle((x, y), radius=0.6,
+                                          dxfattribs={'layer': 'L-INTERPART-REF'})
+                    target_msp.add_text(f'{net_name} / Л.{peer_page}', dxfattribs={
+                        'insert': (x + 1.5, y + 1.5), 'height': 1.8,
+                        'layer': 'L-INTERPART-REF'})
+                if connection_trace is not None:
+                    connection_trace.append({
+                        'instanceId': instance['id'], 'sourceCode': code,
+                        'netId': net_name, 'part': meta['partKind'],
+                        'page': page_index + 1, 'peerPart': port['peerPart'],
+                        'peerPage': peer_page, 'point': [x, y],
+                    })
             # An occurrence label is NOT electrical device/terminal renumbering.
-            target_msp.add_text(f"DRAFT {occurrence}: {instance['tag']} / {code}", dxfattribs={"insert": (cursor_x, 278 if profile else TOP + 5), "height": 2.0})
-            cursor_x += extents.size.x + (profile['gap'] if profile else 0)
+            part_title = PART_TITLES.get(meta.get('partKind'))
+            label = (f"DRAFT {instance['tag']}" if part_title
+                     else f"DRAFT {instance['tag']} / {code}")
+            label_x = (group_cursor_x + meta['sourceOffsetX']) if grouped else cursor_x
+            target_msp.add_text(label, dxfattribs={"insert": (label_x, 278 if profile else TOP + 5), "height": 2.0})
+            next_source = page[source_index_in_page + 1] if source_index_in_page + 1 < len(page) else None
+            next_meta = next_source[5] if next_source is not None and len(next_source) > 5 else {}
+            next_grouped = next_meta.get('groupWidth') is not None
+            next_key = (('group', next_meta.get('sourceIndex')) if next_grouped
+                        else ('item', source_index_in_page + 1))
+            if next_source is None or next_key != group_key:
+                if grouped:
+                    cursor_x = group_cursor_x + group_width + (profile['gap'] if profile else 0)
+                else:
+                    cursor_x += current_extents.size.x + (20 if meta.get('ports') else 0) + (profile['gap'] if profile else 0)
     extents = bbox.extents(target_msp, fast=False)
     if extents.has_data:
         # Keep the header's WCS extents consistent with the assembled model.
@@ -506,23 +914,52 @@ def build_bundle(instances, output, manifest, library=DEFAULT_LIBRARY, sources=D
         raise ValueError('Не задан вид документа для экземпляра')
     files = []
     parameter_trace = []
+    connection_trace = []
+    circuit_pages = []
     for kind, profile in profiles.items():
         selected_instances = [item for item in instances if item['drawingKind'] == kind]
         if not selected_instances:
             continue
         selected = load_selected(library, sources, [item['code'] for item in selected_instances])
-        pages = split_pages(load_and_validate(selected, profile), profile)
+        prepared = load_and_validate(selected, profile)
+        if kind == 'electrical' and any((TEMPLATE_CONTRACTS / f"{item['code']}.json").is_file()
+                                        for item in selected_instances):
+            prepared = prepare_grouped_electrical(prepared, selected_instances)
+        pages = split_pages(prepared, profile)
+        if kind == 'electrical':
+            for index, page in enumerate(pages):
+                parts = []
+                instance_ids = []
+                for item in page:
+                    if len(item) <= 5:
+                        continue
+                    part = item[5].get('partKind')
+                    instance_id = item[5].get('instance', {}).get('id')
+                    if part and part not in parts:
+                        parts.append(part)
+                    if instance_id and instance_id not in instance_ids:
+                        instance_ids.append(instance_id)
+                circuit_pages.append({
+                    'sheetNumber': index + 1,
+                    'part': parts[0] if len(parts) == 1 else 'grouped' if parts else 'unsplit',
+                    'parts': parts,
+                    'instanceIds': instance_ids,
+                })
         path = output.with_name(f'{output.stem}-{kind}.dxf')
         supplements = module_sheets if kind == 'electrical' else []
-        assemble(pages, path, selected_instances, profile, parameter_trace, kind, supplements)
+        assemble(pages, path, selected_instances, profile, parameter_trace, kind, supplements,
+                 connection_trace)
         files.append(path)
-        print(f"{profile['title']}: {len(selected_instances)} фрагментов, {len(pages) + len(supplements)} листов; рамка {profile['frame']}", flush=True)
+        print(f"{profile['title']}: {len(selected_instances)} блоков, {len(prepared)} частей, "
+              f"{len(pages) + len(supplements)} листов; рамка {profile['frame']}", flush=True)
     package_manifest = output.with_name(f'{output.stem}-manifest.json')
     manifest_payload['cadModuleSheets'] = module_sheets
     manifest_payload['cadParameterization'] = {
         'contractVersion': load_field_contract()['schemaVersion'],
         'fields': parameter_trace,
     }
+    manifest_payload['cadInterpartConnections'] = connection_trace
+    manifest_payload['cadCircuitPages'] = circuit_pages
     package_manifest.write_text(json.dumps(manifest_payload, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     with zipfile.ZipFile(output, 'w', compression=zipfile.ZIP_DEFLATED) as archive:
         for path in files:

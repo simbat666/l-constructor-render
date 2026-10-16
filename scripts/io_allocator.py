@@ -52,6 +52,12 @@ def demands_for(counts):
     return [code for code, count in zip(CODES, counts) for _ in range(count)]
 
 
+def module_entries(module_count):
+    return [dict(ref=f'M{index}', brand=CATALOG['module']['brand'], model=CATALOG['module']['model'],
+                 source='moduls:2', terminalStatus=CATALOG['module']['terminalStatus'])
+            for index in range(1, module_count + 1)]
+
+
 def within_capacity(counts, module_count):
     """Necessary capacity bounds before exact pin matching."""
     return (sum(counts) <= BASE_AMOUNT + module_count * MODULE_AMOUNT and
@@ -159,7 +165,7 @@ class SelectionPlan(NamedTuple):
 
 
 @lru_cache(maxsize=64)
-def select_plan(block_choices):
+def select_plan(block_choices, module_count):
     """Cache resource decisions, never block identities, labels, or mutable output."""
     states = {tuple(0 for _ in CODES): ((), 0, ())}
     for block_index, candidates in enumerate(block_choices):
@@ -168,7 +174,7 @@ def select_plan(block_choices):
             for index, (source_row, demand, extra_penalty) in enumerate(candidates):
                 updated = tuple(count + extra for count, extra in zip(counts, demand))
                 # Demand only grows, so a state beyond these bounds stays infeasible.
-                if not within_capacity(updated, MAX_MODULES):
+                if not within_capacity(updated, module_count):
                     continue
                 path = (selected + (index,), penalty + extra_penalty, rows + (source_row,))
                 if updated not in next_states or path[1:] < next_states[updated][1:]:
@@ -179,17 +185,18 @@ def select_plan(block_choices):
     ordered = sorted(states.items(), key=lambda item: (sum(item[0]), item[1][1], item[1][2]))
     # Search in the same objective order as the former exhaustive comparison.
     # The first exact match is optimal; testing all remaining feasible plans is redundant.
-    for module_count in range(MAX_MODULES + 1):
-        for counts, (selected, _, _) in ordered:
-            if within_capacity(counts, module_count) and feasible_match(counts, module_count):
-                return SelectionPlan(counts, selected, module_count)
+    for counts, (selected, _, _) in ordered:
+        if feasible_match(counts, module_count):
+            return SelectionPlan(counts, selected, module_count)
     return SelectionPlan((), (), 0)
 
 
-def allocate_io(blocks):
-    """Choose OL variants, then the fewest modules and a global pin placement."""
+def allocate_io(blocks, module_count=0):
+    """Choose OL variants and a global pin placement on the installed hardware."""
+    if isinstance(module_count, bool) or not isinstance(module_count, int) or not 0 <= module_count <= MAX_MODULES:
+        raise ValueError(f"Число модулей расширения должно быть от 0 до {MAX_MODULES}.")
     if not blocks:
-        return dict(allocations=[], totals={code: 0 for code in CODES}, modules=[])
+        return dict(allocations=[], totals={code: 0 for code in CODES}, modules=module_entries(module_count))
     block_choices = []
     for block in blocks:
         if not block['candidates']:
@@ -203,12 +210,12 @@ def allocate_io(blocks):
             candidates.append((candidate['sourceRow'], tuple(io.get(code, 0) for code in CODES),
                                io.get('DI24-NPN', 0) * 2 + io.get('DI24-HSC-NPN', 0) * 2 + io.get('DOR-NO', 0)))
         block_choices.append(tuple(candidates))
-    plan = select_plan(tuple(block_choices))
+    plan = select_plan(tuple(block_choices), module_count)
     if plan.failed_at is not None:
-        return dict(allocations=[], error=f"Недостаточно совместимых выводов {CATALOG['controller']['brand']} {CATALOG['controller']['model']} и {MAX_MODULES} модулей для {blocks[plan.failed_at]['id']}.")
+        return dict(allocations=[], error=f"Недостаточно совместимых выводов для {blocks[plan.failed_at]['id']} при {module_count} модулях расширения. Добавь модуль расширения или уменьши число сигналов.")
     if not plan.counts:
-        return dict(allocations=[], error='Недостаточно совместимых выводов ПЛК для выбранных схем.')
-    counts, module_count = plan.counts, plan.module_count
+        return dict(allocations=[], error=f"Недостаточно совместимых выводов при {module_count} модулях расширения. Добавь модуль расширения или уменьши число сигналов.")
+    counts = plan.counts
     selected = [block['candidates'][index] for block, index in zip(blocks, plan.choices)]
     matched = pin_match(counts, module_count)
     if matched is None:
@@ -230,7 +237,5 @@ def allocate_io(blocks):
                                                 if option.get('commonDesignation') else None),
                                      source=f"{option['sourceSheet']}:{option['sourceRow']}"))
         allocations.append(dict(id=block['id'], scheme=scheme, channels=channels))
-    modules = [dict(ref=f'M{index}', brand=CATALOG['module']['brand'], model=CATALOG['module']['model'],
-                    source='moduls:2', terminalStatus=CATALOG['module']['terminalStatus'])
-               for index in range(1, module_count + 1)]
+    modules = module_entries(module_count)
     return dict(allocations=allocations, totals=dict(zip(CODES, counts)), modules=modules)

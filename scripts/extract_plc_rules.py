@@ -79,6 +79,33 @@ def main():
         raise ValueError('Изготовитель модуля не совпал с контроллером')
     module_limits = {code: int(module_row[module_columns[code]]) for code in code_columns}
     module_options = read_options('Клеммы модуля тест', module_model, module_limits)
+    template_columns, template_rows = records(marking['Поля схем Э3'])
+    template_required = {'electrical diagram 1', 'role', 'Ключ в DXF', 'signal code', 'Значение из строки вывода'}
+    if not template_required <= set(template_columns):
+        raise ValueError('Поля схем Э3: не хватает колонок привязки CAD')
+    template_fields = {}
+    seen_roles = set()
+    for source_row, row in enumerate(template_rows, start=2):
+        code = row[template_columns['electrical diagram 1']]
+        role = row[template_columns['role']]
+        marker = row[template_columns['Ключ в DXF']]
+        signal = row[template_columns['signal code']]
+        value_from = row[template_columns['Значение из строки вывода']]
+        if (not isinstance(code, str) or not code.startswith('im1-')
+                or role not in {'plc.di', 'plc.common', 'plc.do.1', 'plc.do.2', 'plc.do.common'}
+                or signal not in limits
+                or value_from not in {'entrance number 1', 'entrance number 2', 'CND_COM'}
+                or not isinstance(marker, str) or not marker.startswith('#')
+                or (code, role) in seen_roles):
+            raise ValueError(f'Поля схем Э3:{source_row}: неверная или повторная привязка')
+        if (role.endswith('common') and value_from != 'CND_COM') or (not role.endswith('common') and value_from == 'CND_COM'):
+            raise ValueError(f'Поля схем Э3:{source_row}: роль не соответствует источнику значения')
+        if not role.endswith('common') and marker != '#' + signal:
+            raise ValueError(f'Поля схем Э3:{source_row}: ключ сигнала не соответствует {signal}')
+        seen_roles.add((code, role))
+        template_fields.setdefault(code, []).append({'sourceSheet': 'Поля схем Э3', 'sourceRow': source_row,
+                                                       'role': role, 'marker': marker, 'signal': signal,
+                                                       'valueFrom': value_from})
     if int(base[base_columns['max_moduls']]) < 0:
         raise ValueError('Некорректное максимальное число модулей')
     group_columns, group_rows = records(composition['add_cond'])
@@ -121,6 +148,7 @@ def main():
                    'generalSignalAmount': module_row[module_columns['general signal amount']],
                    'limits': module_limits, 'terminalStatus': 'testDerived'},
         'modulePinOptions': module_options,
+        'templateFields': template_fields,
     }
     TARGET.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding='utf-8')
     print(f'Wrote {TARGET} | {brand} {model} | {len(options)} pin options')

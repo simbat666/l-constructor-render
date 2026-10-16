@@ -21,7 +21,7 @@ export type SchemeRow = { sourceRow: number; diagram1: string | null; diagram2: 
 export type Channel = {
   family: string; address: string; terminals: string[]; group: string;
   deviceRef: string; terminalStatus: 'source' | 'testDerived';
-  commonKey: string | null; commonRef: string | null; source: string;
+  commonKey: string | null; commonDesignation: string | null; commonRef: string | null; source: string;
 };
 export type Calculation = {
   schemaVersion: number; ruleFingerprint: string; status: string;
@@ -50,8 +50,8 @@ export function numericInputRule(rule: string | null) {
   return { min, max, step };
 }
 
-export function projectVersion(motors: ProjectMotor[]) {
-  return JSON.stringify(motors.map(({id, tag, state, mainSchemeCode}) => ({id, tag, state, ...(mainSchemeCode ? {mainSchemeCode} : {})})));
+export function projectVersion(motors: ProjectMotor[], moduleCount = 0) {
+  return JSON.stringify({motors: motors.map(({id, tag, state, mainSchemeCode}) => ({id, tag, state, ...(mainSchemeCode ? {mainSchemeCode} : {})})), moduleCount});
 }
 
 /** Preserve unchanged blocks so a calculation response does not rerender the whole field. */
@@ -67,8 +67,8 @@ export function applyNormalizedAnswers<T extends ProjectMotor>(motors: T[], norm
   return changed ? result : motors;
 }
 
-export function useEngineering(motors: ProjectMotor[], accept: (motors: ProjectMotor[]) => void) {
-  const version = projectVersion(motors);
+export function useEngineering(motors: ProjectMotor[], moduleCount: number, accept: (motors: ProjectMotor[]) => void) {
+  const version = projectVersion(motors, moduleCount);
   const [response, setResponse] = useState<(ResponseData & {version: string}) | null>(null);
   const [failure, setFailure] = useState<{version: string; attempt: number; message: string} | null>(null);
   const [attempt, retry] = useState(0);
@@ -76,7 +76,7 @@ export function useEngineering(motors: ProjectMotor[], accept: (motors: ProjectM
     if (version !== requestedVersion) return;
     const normalized = data.calculation.blocks;
     setFailure(null);
-    setResponse({...data, version: projectVersion(normalized)});
+    setResponse({...data, version: projectVersion(normalized, moduleCount)});
     accept(normalized);
   });
   const fail = useEffectEvent((reason: unknown, requestedVersion: string) => {
@@ -90,7 +90,7 @@ export function useEngineering(motors: ProjectMotor[], accept: (motors: ProjectM
       try {
         const result = await fetch('/api/cad/calculate', {
           method: 'POST', headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({motors: JSON.parse(version)}), signal: controller.signal,
+          body: version, signal: controller.signal,
         });
         const data = await result.json();
         if (!result.ok) throw new Error(data.error || 'Ошибка расчёта');

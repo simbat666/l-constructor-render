@@ -51,6 +51,17 @@ def concise(calculation, expected):
 
 
 class FrozenEngineFixturesTests(unittest.TestCase):
+    def test_io_summary_keeps_device_separate_from_terminal_and_common(self):
+        case = next(case for case in FIXTURES['cases'] if case['id'] == 'direct-motor')
+        result = calculate_cabinet(copy.deepcopy(case['motors']))
+        block = result['blocks'][0]
+        detail = next(item['detail'] for item in block['decisionTrace']['outputs'] if item['id'] == 'io')
+        for channel in block['channels']:
+            self.assertIn(f"{channel['deviceRef']} · {channel['family']} · клемма {' / '.join(channel['terminals'])}", detail)
+            if channel['commonDesignation']:
+                self.assertIn(f"общий {channel['commonDesignation']}", detail)
+        self.assertNotIn('PLC:', detail)
+
     def test_explicit_choice_reaches_each_replacement_template(self):
         source = next(case for case in FIXTURES['cases'] if case['id'] == 'direct-motor')['motors'][0]
         for code, di_family, do_family in (
@@ -87,7 +98,7 @@ class FrozenEngineFixturesTests(unittest.TestCase):
             motor['id'] = f'motor-{index + 1}'
             motor['tag'] = f'M{index + 1}'
             motors.append(motor)
-        calculation = calculate_cabinet(motors)
+        calculation = calculate_cabinet(motors, module_count=1)
         self.assertEqual(calculation['errors'], [])
         self.assertTrue(calculation['canExport'])
         self.assertTrue(any('отдельный лист' in warning for warning in calculation['warnings']))
@@ -97,15 +108,35 @@ class FrozenEngineFixturesTests(unittest.TestCase):
         self.assertEqual(len(channels), 32)
         self.assertEqual(len({(item['deviceRef'], item['address']) for item in channels}), 32)
 
+    def test_manual_module_count_controls_capacity_and_hardware(self):
+        source = next(case for case in FIXTURES['cases'] if case['id'] == 'direct-motor')['motors'][0]
+        motors = []
+        for index in range(16):
+            motor = copy.deepcopy(source)
+            motor['id'] = f'motor-{index + 1}'
+            motor['tag'] = f'M{index + 1}'
+            motors.append(motor)
+        missing = calculate_cabinet(motors, module_count=0)
+        self.assertFalse(missing['canExport'])
+        self.assertTrue(any('Добавь модуль расширения' in error for error in missing['errors']))
+        installed = calculate_cabinet(motors, module_count=1)
+        self.assertTrue(installed['canExport'])
+        self.assertEqual([module['ref'] for module in installed['modules']], ['M1'])
+        removed = calculate_cabinet(motors, module_count=0)
+        self.assertFalse(removed['canExport'])
+        spare = calculate_cabinet([copy.deepcopy(source)], module_count=2)
+        self.assertEqual([module['ref'] for module in spare['modules']], ['M1', 'M2'])
+        self.assertEqual([part['ref'] for part in spare['plcHardware']], ['PLC', 'M1', 'M2'])
+
     def test_cad_names_follow_active_ol_answers(self):
         self.assertEqual([(row['keyDiagram'], row['sourceRow']) for row in BASE['diagramHeads']],
-                         [('Imd-3', 2), ('Imd-1', 3), ('Imd-2', 4)])
+                         [(key, start + offset) for start in (2, 5, 8, 11)
+                          for offset, key in enumerate(('Imd-3', 'Imd-1', 'Imd-2'))])
         case = next(case for case in FIXTURES['cases'] if case['id'] == 'direct-motor')
         result = calculate_cabinet(copy.deepcopy(case['motors']))
         self.assertTrue(result['instances'])
-        # The source OL has no diagram-head row for im1-014. Its supplied DWG
-        # carries the same keys, so values trace directly to active Ques 1 rows.
-        self.assertEqual(result['instances'][0]['cadHeadRules'], [])
+        self.assertEqual({rule['keyDiagram'] for rule in result['instances'][0]['cadHeadRules']},
+                         {'Imd-3', 'Imd-1', 'Imd-2'})
         self.assertEqual(result['instances'][0]['cadFieldValues']['marking'], 'M1')
         self.assertTrue(result['instances'][0]['cadFieldSources']['marking'].startswith('Ques 1:'))
 

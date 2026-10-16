@@ -29,20 +29,265 @@ def im1_014_channels():
          'deviceRef': 'PLC', 'commonDesignation': 'GND3'},
     ]
 
+def template_heads(code, marking='M1'):
+    rows = json.loads((ROOT / 'data/motor-v2.json').read_text(encoding='utf-8'))['diagramHeads']
+    values = {'Imd-3': 'Насос', 'Imd-1': marking, 'Imd-2': marking}
+    return [dict(row, value=values[row['keyDiagram']]) for row in rows if row['code'] == code]
+
 class CadTests(unittest.TestCase):
+    def test_four_motor_sources_have_exact_three_part_geometry(self):
+        expected_connections = {'im1-011': 0, 'im1-012': 0,
+                                'im1-013': 0, 'im1-014': 0}
+        for code, count in expected_connections.items():
+            with self.subTest(code=code):
+                path = ROOT / 'data/cad-template-contracts' / f'{code}.json'
+                contract = json.loads(path.read_text(encoding='utf-8'))
+                document = ezdxf.readfile(ROOT / 'data/dxf-sources' / f'{code}.dxf')
+                model = document.modelspace()
+                for handle in contract['detachedHatches']:
+                    model.delete_entity(document.entitydb[handle])
+                groups, connections = assembler.validate_circuit_parts(code, model, contract)
+                self.assertEqual(set(groups), {'power', 'control', 'feedback'})
+                self.assertEqual(len(connections), count)
+                changed = copy.deepcopy(contract)
+                changed['circuitParts']['feedback'].pop()
+                with self.assertRaisesRegex(ValueError, 'не покрывает DXF'):
+                    assembler.validate_circuit_parts(code, model, changed)
+                if count:
+                    changed = copy.deepcopy(contract)
+                    changed['circuitParts']['interpartConnections'] = []
+                    with self.assertRaisesRegex(ValueError, 'не все межчастные соединения'):
+                        assembler.validate_circuit_parts(code, model, changed)
+
+    def test_pnp_feedback_owns_complete_supply_branch(self):
+        for code, wire, return_wire, dot in [
+            ('im1-012', '16EA', '16EB', ['16E8', '16E9']),
+            ('im1-014', '17B6', '17B7', ['17B4', '17B5']),
+        ]:
+            with self.subTest(code=code):
+                contract = json.loads((ROOT / 'data/cad-template-contracts' / f'{code}.json').read_text())
+                parts = contract['circuitParts']
+                for handle in [wire, return_wire, *dot]:
+                    self.assertIn(handle, parts['feedback'])
+                    self.assertNotIn(handle, parts['control'])
+                doc = ezdxf.readfile(ROOT / 'data/dxf-sources' / f'{code}.dxf')
+                self.assertTrue(doc.entitydb[wire].dxf.end.isclose(doc.entitydb[return_wire].dxf.end))
+                self.assertEqual(parts['interpartConnections'], [])
+
+    def test_bundle_groups_circuits_and_keeps_supply_in_feedback(self):
+        variants = [
+            ('im1-011', [
+                dict(family='DI24-NPN', address='07', terminals=['07'], deviceRef='PLC', commonDesignation='GND1'),
+                dict(family='DOR-NO', address='Q1-1', terminals=['Q1-1', 'Q1-2'], deviceRef='PLC', commonDesignation=None),
+            ]),
+            ('im1-014', im1_014_channels()),
+        ]
+        instances = [dict(id=f'm{index}', tag=f'M{index}', code=code, drawingKind='electrical',
+                          channels=channels, cadHeadRules=template_heads(code, f'M{index}'))
+                     for index, (code, channels) in enumerate(variants, start=1)]
+        with tempfile.TemporaryDirectory(prefix='l-grouped-circuits-') as directory:
+            root = Path(directory)
+            source_manifest = root / 'input.json'
+            source_manifest.write_text(json.dumps({'instances': instances}), encoding='utf-8')
+            assembler.build_bundle(instances, root / 'result.zip', source_manifest)
+            manifest = json.loads((root / 'result-manifest.json').read_text(encoding='utf-8'))
+            self.assertEqual([page['part'] for page in manifest['cadCircuitPages']], ['power', 'control', 'feedback'])
+            self.assertEqual(manifest['cadCircuitPages'][0]['parts'],
+                             ['power'])
+            self.assertEqual(manifest['cadCircuitPages'][0]['instanceIds'], ['m1', 'm2'])
+            fields = manifest['cadParameterization']['fields']
+            self.assertEqual(len(fields), 26)
+            self.assertEqual({field['circuitPart'] for field in fields},
+                             {'power', 'control', 'feedback'})
+            assignments = {(field['instanceId'], field['fieldId']): field
+                           for field in fields}
+            self.assertEqual(assignments['m2', 'plc.di']['after'], '01')
+            self.assertEqual(assignments['m2', 'plc.di']['circuitPart'], 'feedback')
+            self.assertEqual(assignments['m2', 'plc.common']['after'], 'GND1')
+            self.assertEqual(assignments['m2', 'plc.do.1']['after'], 'T1')
+            self.assertEqual(assignments['m2', 'plc.do.1']['circuitPart'], 'control')
+            self.assertEqual(assignments['m2', 'plc.do.common']['after'], 'GND3')
+            self.assertEqual(assignments['m2', 'device.qf.main']['after'], 'QF2')
+            self.assertEqual(assignments['m2', 'device.qf.contact']['after'], 'QF2.1')
+            self.assertEqual(assignments['m2', 'device.km.main']['after'], 'KM2')
+            self.assertEqual(assignments['m2', 'device.km.contact']['after'], 'KM2.1')
+            ports = manifest['cadInterpartConnections']
+            self.assertEqual(ports, [])
+            document = ezdxf.readfile(root / 'result-electrical.dxf')
+            self.assertFalse(document.audit().has_errors)
+            links = [entity.dxf.text for entity in document.modelspace().query('TEXT')
+                     if entity.dxf.layer == 'L-INTERPART-REF']
+            self.assertEqual(links, [])
+
+    def test_grouped_scheme_uses_selected_universal_pin_and_gnd(self):
+        code = 'im1-014'
+        instance = dict(id='m1', tag='M1', code=code, drawingKind='electrical',
+                        channels=[dict(family='DI24-PNP', address='U1', terminals=['U1'],
+                                       deviceRef='PLC', commonDesignation='GND3'),
+                                  dict(family='DOT-PNP', address='U7', terminals=['U7'],
+                                       deviceRef='PLC', commonDesignation='GND3')],
+                        cadHeadRules=template_heads(code))
+        with tempfile.TemporaryDirectory(prefix='l-universal-pin-') as directory:
+            root = Path(directory)
+            source_manifest = root / 'input.json'
+            source_manifest.write_text(json.dumps({'instances': [instance]}), encoding='utf-8')
+            assembler.build_bundle([instance], root / 'result.zip', source_manifest)
+            manifest = json.loads((root / 'result-manifest.json').read_text(encoding='utf-8'))
+            marked = {field['fieldId']: field for field in manifest['cadParameterization']['fields']}
+            self.assertEqual((marked['plc.di']['after'], marked['plc.common']['after']), ('U1', 'GND3'))
+            self.assertEqual((marked['plc.do.1']['after'], marked['plc.do.common']['after']), ('U7', 'GND3'))
+            self.assertEqual((marked['plc.common']['sheetNumber'], marked['plc.do.common']['sheetNumber']), (3, 2))
+            drawing = ezdxf.readfile(root / 'result-electrical.dxf')
+            self.assertFalse(drawing.audit().has_errors)
+            texts = [entity.plain_text().strip() for entity in drawing.modelspace().query('MTEXT')]
+            self.assertEqual(texts.count('GND3'), 2)
+            self.assertNotIn('GND1', texts)
+
+    def test_all_four_variants_prepare_in_block_order(self):
+        variants = [('im1-011', 'DI24-NPN', 'DOR-NO'),
+                    ('im1-012', 'DI24-PNP', 'DOR-NO'),
+                    ('im1-013', 'DI24-NPN', 'DOT-PNP'),
+                    ('im1-014', 'DI24-PNP', 'DOT-PNP')]
+        instances = []
+        for index, (code, di, do) in enumerate(variants, start=1):
+            input_pin = '07' if di == 'DI24-NPN' else '01'
+            output_pins = ['Q1-1', 'Q1-2'] if do == 'DOR-NO' else ['T1']
+            instances.append(dict(id=f'm{index}', tag=f'M{index}', code=code,
+                                  channels=[dict(family=di, address=input_pin, terminals=[input_pin],
+                                                 deviceRef='PLC', commonDesignation='GND1'),
+                                            dict(family=do, address=output_pins[0], terminals=output_pins,
+                                                 deviceRef='PLC', commonDesignation=(
+                                                     'GND3' if do == 'DOT-PNP' else None))],
+                                  cadHeadRules=template_heads(code, f'M{index}')))
+        profile = json.loads(assembler.PROFILES.read_text(encoding='utf-8'))['electrical']
+        selected = assembler.load_selected(assembler.DEFAULT_LIBRARY, assembler.DEFAULT_DXF_SOURCES,
+                                           [item['code'] for item in instances])
+        grouped = assembler.prepare_grouped_electrical(
+            assembler.load_and_validate(selected, profile), instances)
+        self.assertEqual(len(grouped), 12)
+        self.assertEqual([item[5]['partKind'] for item in grouped],
+                         ['power'] * 4 + ['control'] * 4 + ['feedback'] * 4)
+        self.assertEqual(sum(len(item[5]['ports']) for item in grouped), 0)
+        pages = assembler.split_pages(grouped, profile)
+        self.assertEqual([len(page) for page in pages], [4, 4, 4])
+        for page in pages:
+            self.assertEqual(len({item[5]['partKind'] for item in page}), 1)
+            self.assertEqual([item[5]['sourceIndex'] for item in page], [0, 1, 2, 3])
+        with tempfile.TemporaryDirectory(prefix='l-four-circuits-') as directory:
+            output = Path(directory) / 'four.dxf'
+            trace = []
+            connections = []
+            assembler.assemble(pages, output, instances, profile, trace,
+                               'electrical', connection_trace=connections)
+            self.assertFalse(ezdxf.readfile(output).audit().has_errors)
+            self.assertEqual(len(trace), 52)
+            self.assertEqual(connections, [])
+
+    def test_grouped_sheets_fill_available_width_before_continuing(self):
+        code = 'im1-014'
+        profile = json.loads(assembler.PROFILES.read_text(encoding='utf-8'))['electrical']
+        instances = [dict(id=f'm{i}', tag=f'M{i}', code=code, drawingKind='electrical',
+                          channels=im1_014_channels(), cadHeadRules=template_heads(code, f'M{i}'))
+                     for i in range(12)]
+        selected = assembler.load_selected(assembler.DEFAULT_LIBRARY,
+                                           assembler.DEFAULT_DXF_SOURCES, [code] * len(instances))
+        grouped = assembler.prepare_grouped_electrical(
+            assembler.load_and_validate(selected, profile), instances)
+        pages = assembler.split_pages(grouped, profile)
+        self.assertEqual([len(page) for page in pages], [10, 2, 12, 8, 4])
+        self.assertEqual([page[0][5]['partKind'] for page in pages],
+                         ['power', 'power', 'control', 'feedback', 'feedback'])
+        available = profile['right'] - profile['left']
+        for index, page in enumerate(pages):
+            widths = [assembler.source_layout_width(item) for item in page]
+            used = sum(widths) + profile['gap'] * (len(page) - 1)
+            self.assertLessEqual(used, available + 0.001)
+            if index + 1 < len(pages) and pages[index + 1][0][5]['partKind'] == page[0][5]['partKind']:
+                next_width = assembler.source_layout_width(pages[index + 1][0])
+                self.assertGreater(used + profile['gap'] + next_width, available)
+
+    def test_each_circuit_kind_gets_its_own_sheet(self):
+        code = 'im1-014'
+        instance = dict(id='m1', tag='M1', code=code, drawingKind='electrical',
+                        channels=im1_014_channels(), cadHeadRules=template_heads(code))
+        profile = json.loads(assembler.PROFILES.read_text(encoding='utf-8'))['electrical']
+        selected = assembler.load_selected(assembler.DEFAULT_LIBRARY, assembler.DEFAULT_DXF_SOURCES, [code])
+        prepared = assembler.prepare_grouped_electrical(assembler.load_and_validate(selected, profile), [instance])
+        pages = assembler.split_pages(prepared, profile)
+        self.assertEqual([[item[5]['partKind'] for item in page] for page in pages],
+                         [['power'], ['control'], ['feedback']])
+        with tempfile.TemporaryDirectory(prefix='l-part-layout-') as directory:
+            output = Path(directory) / 'layout.dxf'
+            connections = []
+            assembler.assemble(pages, output, [instance], profile, connection_trace=connections)
+            drawing = ezdxf.readfile(output)
+            self.assertFalse(drawing.audit().has_errors)
+            labels = [e for e in drawing.modelspace().query('TEXT')
+                      if e.dxf.text.startswith('DRAFT ')]
+            self.assertEqual(len(labels), 3)
+            for index, label in enumerate(labels):
+                self.assertAlmostEqual(label.dxf.insert.x, index * (assembler.PAGE_WIDTH + assembler.PAGE_GAP) + profile['left'])
+            self.assertEqual(connections, [])
+            self.assertEqual(len([entity for entity in drawing.modelspace().query('TEXT')
+                                  if entity.dxf.layer == 'L-INTERPART-REF']), 0)
+
+    def test_repeated_motor_sheets_pack_and_keep_one_common_label(self):
+        profile = json.loads(assembler.PROFILES.read_text(encoding='utf-8'))['electrical']
+        codes = ['im1-012'] * 4
+        selected = assembler.load_selected(assembler.DEFAULT_LIBRARY, assembler.DEFAULT_DXF_SOURCES, codes)
+        pages = assembler.split_pages(assembler.load_and_validate(selected, profile), profile)
+        self.assertEqual([len(page) for page in pages], [3, 1])
+        instances = [dict(id=f'm{index}', tag=f'M{index}', channels=[
+            dict(family='DI24-PNP', address=f'{index:02d}', terminals=[f'{index:02d}'],
+                 deviceRef='PLC', commonDesignation='GND1'),
+            dict(family='DOR-NO', address=f'Q{index}-1', terminals=[f'Q{index}-1', f'Q{index}-2'],
+                 deviceRef='PLC')], cadHeadRules=template_heads('im1-012', f'M{index}')) for index in range(1, 5)]
+        with tempfile.TemporaryDirectory(prefix='l-packed-motors-') as directory:
+            output = Path(directory) / 'packed.dxf'
+            trace = []
+            assembler.assemble(pages, output, instances=instances, profile=profile, parameter_trace=trace)
+            document = ezdxf.readfile(output)
+            self.assertFalse(document.audit().has_errors)
+            commons = [entity for entity in document.modelspace().query('MTEXT')
+                       if entity.plain_text().strip() == 'GND1']
+            self.assertEqual(len(commons), 2)  # One common per page.
+            suppressed = [field for field in trace if field['status'] == 'shared-common']
+            self.assertEqual(len(suppressed), 2)  # Three fragments on page 1 share one GND1.
+            self.assertTrue(all(len(field['removedEntityHandles']) == 5 for field in suppressed))
+            anchors = [entity.dxf.insert for entity in document.modelspace().query('MTEXT')
+                       if entity.plain_text().strip() == 'ХТ1']
+            self.assertEqual(len(anchors), 4)
+            self.assertAlmostEqual(anchors[0].y, anchors[1].y)
+            self.assertAlmostEqual(anchors[1].y, anchors[2].y)
+            self.assertTrue(anchors[0].x < anchors[1].x < anchors[2].x)
+
+    def test_motor_power_points_match_frame_buses(self):
+        profile = json.loads(assembler.PROFILES.read_text(encoding='utf-8'))['electrical']
+        frame = ezdxf.readfile(ROOT / 'data/dxf-frames' / profile['frame'])
+        l1_y = frame.entitydb['12B0'].dxf.start.y - profile['origin'][1]
+        dc_y = frame.entitydb['12B3'].dxf.start.y - profile['origin'][1]
+        for code, l1_handle, dc_handle in [('im1-011', '15D5', None), ('im1-012', '16B1', '16E9'),
+                                          ('im1-013', '15D5', None), ('im1-014', '178B', '17B5')]:
+            document = ezdxf.readfile(assembler.DEFAULT_DXF_SOURCES / f'{code}.dxf')
+            placement = assembler.template_placement(code, document.modelspace())
+            dy = placement['y'] - placement['anchor'].y
+            self.assertAlmostEqual(document.entitydb[l1_handle].dxf.center.y + dy, l1_y, places=5)
+            if dc_handle:
+                self.assertAlmostEqual(document.entitydb[dc_handle].dxf.center.y + dy, dc_y, places=5)
+
     def test_new_motor_templates_keep_the_old_sheet_anchor(self):
         profile = json.loads(assembler.PROFILES.read_text(encoding='utf-8'))['electrical']
         codes = ['im1-011', 'im1-012', 'im1-013', 'im1-014']
         selected = assembler.load_selected(assembler.DEFAULT_LIBRARY, assembler.DEFAULT_DXF_SOURCES, codes)
         prepared = assembler.load_and_validate(selected, profile)
         pages = assembler.split_pages(prepared, profile)
-        self.assertEqual([[item[0] for item in page] for page in pages], [[code] for code in codes])
+        self.assertEqual([[item[0] for item in page] for page in pages], [codes[:3], codes[3:]])
         for index, page in enumerate(pages):
             code, _, modelspace, _, _ = page[0]
             placement = assembler.template_placement(code, modelspace)
             self.assertIsNotNone(placement)
             self.assertAlmostEqual(placement['x'], 146.83)
-            self.assertAlmostEqual(placement['y'], 72.52)
+            self.assertAlmostEqual(placement['y'], 60.37893761952546)
             anchor = modelspace.doc.entitydb.get(json.loads(
                 (ROOT / 'data/cad-template-contracts' / f'{code}.json').read_text(encoding='utf-8')
             )['placement']['anchorHandle'])
@@ -51,25 +296,23 @@ class CadTests(unittest.TestCase):
                 output = Path(directory) / 'sheet.dxf'
                 di = 'DI24-PNP' if code in {'im1-012', 'im1-014'} else 'DI24-NPN'
                 do = 'DOT-PNP' if code in {'im1-013', 'im1-014'} else 'DOR-NO'
-                channels = [dict(family=di, address='01', terminals=['01'], deviceRef='PLC', commonDesignation='GND1'),
+                di_terminal = '01' if di == 'DI24-PNP' else '07'
+                channels = [dict(family=di, address=di_terminal, terminals=[di_terminal], deviceRef='PLC', commonDesignation='GND1'),
                             dict(family=do, address='T1' if do == 'DOT-PNP' else 'Q1-1',
                                  terminals=['T1'] if do == 'DOT-PNP' else ['Q1-1', 'Q1-2'],
                                  deviceRef='PLC', commonDesignation='GND3' if do == 'DOT-PNP' else None)]
                 instance = dict(id=f'm{index}', tag='M1', channels=channels,
                                 cadFieldValues={'processDeviceType': 'Насос', 'marking': 'M1', 'deviceTag': 'M1'},
                                 cadFieldSources={'processDeviceType': 'Ques 1:20', 'marking': 'Ques 1:21', 'deviceTag': 'Ques 1:22'},
-                                cadHeadRules=[dict(sourceRow=row, code=code, keyDiagram=key, placeholder=placeholder, value=value)
-                                              for row, key, placeholder, value in (
-                                                  (2, 'Imd-3', '#Process Device Type1', 'Насос'),
-                                                  (3, 'Imd-1', '#Marking2', 'M1'),
-                                                  (4, 'Imd-2', '#Device tag', 'M1'))] if code == 'im1-011' else [])
-                assembler.assemble([page], output, [instance], profile=profile)
+                                cadHeadRules=template_heads(code))
+                assembler.assemble([[page[0]]], output, [instance], profile=profile)
                 document = ezdxf.readfile(output)
                 self.assertFalse(document.audit().has_errors)
                 placed = [e for e in document.modelspace().query('MTEXT') if e.plain_text().strip() == 'ХТ1']
                 self.assertEqual(len(placed), 1)
-                self.assertAlmostEqual(placed[0].dxf.insert.x, 146.83, places=2)
-                self.assertAlmostEqual(placed[0].dxf.insert.y, 72.52, places=2)
+                expected_x = profile['left']
+                self.assertAlmostEqual(placed[0].dxf.insert.x, expected_x, places=2)
+                self.assertAlmostEqual(placed[0].dxf.insert.y, 60.37893761952546, places=2)
 
     def test_four_user_supplied_variants_match_sources_and_io(self):
         library = json.loads((ROOT / 'data/scheme-library.json').read_text(encoding='utf-8'))
@@ -90,8 +333,8 @@ class CadTests(unittest.TestCase):
                 self.assertEqual(converted['sourceSha256'], registered['sha256'])
                 self.assertEqual(converted['output']['sha256'], hashlib.sha256(source_dxf.read_bytes()).hexdigest())
                 self.assertEqual(contract['sourceSha256'], converted['output']['sha256'])
-                self.assertEqual((contract['inputFamily'], contract['outputFamily']), (input_family, output_family))
-                self.assertEqual(len(converted['preparation']['removedOrphanHatchHandles']), 23)
+                self.assertEqual((contract['signals']['di'], contract['signals']['do']), (input_family, output_family))
+                self.assertEqual(len(contract['detachedHatches']), 23)
                 document = ezdxf.readfile(source_dxf)
                 self.assertFalse(document.audit().has_errors)
                 for field in contract['fields']:
@@ -118,11 +361,7 @@ class CadTests(unittest.TestCase):
                          terminals=['Q1-1', 'Q1-2'] if do_family == 'DOR-NO' else ['T1'],
                          deviceRef='PLC', commonDesignation=None if do_family == 'DOR-NO' else 'GND3'),
                 ]
-                head = [dict(sourceRow=row, code=code, keyDiagram=key, placeholder=placeholder, value=value)
-                        for row, key, placeholder, value in (
-                            (2, 'Imd-3', '#Process Device Type1', 'Насос'),
-                            (3, 'Imd-1', '#Marking2', 'M1'),
-                            (4, 'Imd-2', '#Device tag', 'M1'))] if code == 'im1-011' else []
+                head = template_heads(code)
                 trace = assembler.apply_template_contract(code, document.modelspace(), source_sha,
                                                            {'tag': 'M1', 'channels': channels, 'cadHeadRules': head,
                                                             'cadFieldValues': {'processDeviceType': 'Насос', 'marking': 'M1', 'deviceTag': 'M1'},
@@ -130,13 +369,82 @@ class CadTests(unittest.TestCase):
                 changed = {item['fieldId']: item['after'] for item in trace}
                 self.assertEqual(changed['plc.di'], channels[0]['address'])
                 self.assertEqual(changed['plc.do.1'], channels[1]['terminals'][0])
-                self.assertEqual(changed['plc.inputCommon'], 'GND1')
+                self.assertEqual(changed['plc.common'], 'GND1')
                 self.assertEqual(changed['header.processDeviceType'], 'Насос')
                 self.assertEqual(changed['header.marking'], 'M1')
                 self.assertFalse(any(item['status'] == 'unresolved' for item in trace))
-                self.assertEqual(changed.get('plc.outputCommon'), 'GND3' if do_family == 'DOT-PNP' else None)
+                self.assertEqual(changed.get('plc.do.common'), 'GND3' if do_family == 'DOT-PNP' else None)
                 self.assertEqual(changed.get('plc.do.2'), 'Q1-2' if do_family == 'DOR-NO' else None)
+                self.assertFalse(any('#' in item.plain_text() for item in document.modelspace().query('MTEXT')))
+                contract = json.loads((ROOT / 'data/cad-template-contracts' / f'{code}.json').read_text())
+                for field in contract['fields']:
+                    if not field['role'].startswith(('plc.', 'terminal.')):
+                        continue
+                    label = document.entitydb[field['handle']]
+                    line = document.entitydb[field['lineHandle']]
+                    box = document.entitydb[field['boxHandle']]
+                    xs = [point[0] for point in box.get_points('xy')]
+                    ys = [point[1] for point in box.get_points('xy')]
+                    self.assertAlmostEqual(label.dxf.insert.x, line.dxf.start.x)
+                    self.assertAlmostEqual(label.dxf.insert.y, (min(ys) + max(ys)) / 2)
+                    self.assertEqual(label.dxf.attachment_point, 5)
+                    self.assertEqual(label.dxf.width, 0)
+                    self.assertGreater(label.dxf.char_height, 1.1)
+                    probe = document.modelspace().add_mtext(label.plain_text(), dxfattribs={
+                        'style': label.dxf.style, 'char_height': label.dxf.char_height,
+                        'width': 0, 'attachment_point': 5,
+                    })
+                    self.assertLessEqual(ezdxf.bbox.extents([probe], fast=True).size.x,
+                                         max(xs) - min(xs) - .49)
+                    document.modelspace().delete_entity(probe)
                 self.assertFalse(document.audit().has_errors)
+
+    def test_empty_optional_headers_and_module_pins_leave_no_template_markers(self):
+        code = 'im1-014'
+        heads = template_heads(code)
+        for rule in heads:
+            if rule['keyDiagram'] in ('Imd-1', 'Imd-2'):
+                rule['value'] = None
+        instance = dict(id='m1', tag='M1', code=code, drawingKind='electrical',
+                        channels=[
+                            dict(family='DI24-PNP', address='U1', terminals=['U1'],
+                                 deviceRef='M1', commonDesignation='GND3'),
+                            dict(family='DOT-PNP', address='U7', terminals=['U7'],
+                                 deviceRef='PLC', commonDesignation='GND3'),
+                        ], cadHeadRules=heads)
+        with tempfile.TemporaryDirectory(prefix='l-module-complete-labels-') as directory:
+            root = Path(directory)
+            manifest = root / 'manifest.json'
+            manifest.write_text(json.dumps({'instances': [instance], 'plcHardware': [
+                {'ref': 'M1', 'brand': 'ZENTEC', 'model': 'M245 no display'}]}), encoding='utf-8')
+            assembler.build_bundle([instance], root / 'result.zip', manifest)
+            drawing = ezdxf.readfile(root / 'result-electrical.dxf')
+            self.assertFalse(drawing.audit().has_errors)
+            labels = [entity.plain_text() for entity in drawing.modelspace().query('MTEXT')]
+            self.assertFalse(any('#' in label for label in labels))
+            self.assertGreaterEqual(labels.count('GND3'), 2)  # PLC and M1 are separate commons.
+            self.assertTrue(any(entity.dxf.text == 'M1' for entity in drawing.modelspace().query('TEXT')))
+            selected = [entity for entity in drawing.modelspace().query('MTEXT')
+                        if entity.plain_text() in ('U1', 'U7', 'GND3')
+                        and assembler.source_layer_name(entity.dxf.layer) == 'XT1']
+            self.assertEqual(len(selected), 4)
+            for label in selected:
+                boxes = [entity for entity in drawing.modelspace().query('LWPOLYLINE')
+                         if len(entity) == 4
+                         and abs((min(p[0] for p in entity.get_points('xy'))
+                                  + max(p[0] for p in entity.get_points('xy'))) / 2
+                                 - label.dxf.insert.x) < .01
+                         and abs((min(p[1] for p in entity.get_points('xy'))
+                                  + max(p[1] for p in entity.get_points('xy'))) / 2
+                                 - label.dxf.insert.y) < .01]
+                self.assertEqual(len(boxes), 1)
+            trace = json.loads((root / 'result-manifest.json').read_text())['cadParameterization']['fields']
+            marked = {field['fieldId']: field for field in trace}
+            self.assertEqual(marked['plc.di']['after'], 'U1')
+            self.assertEqual(marked['plc.di']['assignedModule'], 'M1')
+            self.assertEqual(marked['plc.common']['status'], 'applied')
+            self.assertEqual(marked['header.marking']['status'], 'empty-optional')
+            self.assertEqual(marked['header.deviceTag']['status'], 'empty-optional')
 
     def test_im1_011_source_and_field_contract_match(self):
         source = ROOT / 'data/dxf-sources/im1-011.dxf'
@@ -168,7 +476,7 @@ class CadTests(unittest.TestCase):
             assembler.assemble(
                 assembler.split_pages(assembler.load_and_validate(selected)),
                 output, instances=[{'id': f'm{index}', 'tag': f'M{index}',
-                                    'channels': im1_014_channels(), 'cadHeadRules': []}
+                                    'channels': im1_014_channels(), 'cadHeadRules': template_heads('im1-014', f'M{index}')}
                                    for index in (1, 2)], parameter_trace=trace,
             )
             document = ezdxf.readfile(output)
@@ -179,8 +487,8 @@ class CadTests(unittest.TestCase):
             self.assertEqual(marked['m2', 'device.km.contact'], 'KM2.1')
             self.assertEqual(marked['m1', 'terminal.xt1.1'], '1')
             self.assertEqual(marked['m2', 'terminal.xt1.1'], '3')
-            self.assertEqual(marked['m1', 'plc.outputCommon'], 'GND3')
-            self.assertTrue(any(item['status'] == 'unresolved' for item in trace if item['fieldId'].startswith('header.')))
+            self.assertEqual(marked['m1', 'plc.do.common'], 'GND3')
+            self.assertFalse(any(item['status'] == 'unresolved' for item in trace if item['fieldId'].startswith('header.')))
 
     def test_device_renumbering_trace_keeps_source_layer_and_handle(self):
         selected = assembler.load_selected(
@@ -237,7 +545,7 @@ class CadTests(unittest.TestCase):
         self.assertEqual(fields['m1', 'plc.di'], '07')
         self.assertEqual(fields['m1', 'plc.do.1'], 'Q1-1')
         self.assertEqual(fields['m1', 'plc.do.2'], 'Q1-2')
-        self.assertEqual(fields['m1', 'plc.inputCommon'], 'GND1')
+        self.assertEqual(fields['m1', 'plc.common'], 'GND1')
         self.assertEqual(fields['m1', 'header.deviceTag'], 'M1')
         self.assertEqual(fields['m1', 'header.processDeviceType'], 'Насос')
         self.assertEqual(fields['m1', 'header.marking'], 'Н1')
@@ -260,16 +568,23 @@ class CadTests(unittest.TestCase):
         trace = assembler.apply_template_contract('im1-011',
             ezdxf.readfile(assembler.DEFAULT_DXF_SOURCES / 'im1-011.dxf').modelspace(),
             source_hash, module_instance, {})
-        unresolved = {field['fieldId']: field for field in trace if field['status'] == 'unresolved'}
-        self.assertEqual(unresolved['plc.di']['assignedModule'], 'M1')
-        self.assertEqual(unresolved['plc.inputCommon']['assignedModule'], 'M1')
-        self.assertNotIn('plc.do.1', unresolved)
+        module_fields = {field['fieldId']: field for field in trace if field['assignedModule']}
+        self.assertEqual((module_fields['plc.di']['after'], module_fields['plc.di']['assignedModule']), ('07', 'M1'))
+        self.assertEqual((module_fields['plc.common']['after'], module_fields['plc.common']['assignedModule']), ('GND1', 'M1'))
+        self.assertTrue(all(field['ownerHandle'] for field in module_fields.values()))
+        self.assertFalse(any(field['status'] == 'unresolved' for field in trace))
+        wrong_pair = copy.deepcopy(instances[0])
+        wrong_pair['channels'][0].update(address='13', terminals=['13'], commonKey='#GND1', commonDesignation='GND1')
+        with self.assertRaisesRegex(ValueError, 'пара вывод/GND'):
+            assembler.apply_template_contract('im1-011',
+                ezdxf.readfile(assembler.DEFAULT_DXF_SOURCES / 'im1-011.dxf').modelspace(),
+                source_hash, wrong_pair, {})
 
     def test_module_assignment_adds_a_separate_named_sheet(self):
         channels = [dict(family='DI24-PNP', address='06', terminals=['06'], deviceRef='PLC', commonDesignation='GND1'),
                     dict(family='DOR-NO', address='Q1-1', terminals=['Q1-1', 'Q1-2'], deviceRef='M1', commonDesignation=None)]
         instance = dict(id='motor-6:1', tag='M6', code='im1-012', drawingKind='electrical', channels=channels,
-                        cadHeadRules=[], cadFieldValues={'processDeviceType': 'Насос', 'marking': 'M6', 'deviceTag': 'M6'},
+                        cadHeadRules=template_heads('im1-012', 'M6'), cadFieldValues={'processDeviceType': 'Насос', 'marking': 'M6', 'deviceTag': 'M6'},
                         cadFieldSources={'processDeviceType': 'Ques 1:20', 'marking': 'Ques 1:21', 'deviceTag': 'Ques 1:22'})
         with tempfile.TemporaryDirectory(prefix='l-module-sheet-') as directory:
             root = Path(directory)
@@ -280,21 +595,119 @@ class CadTests(unittest.TestCase):
             document = ezdxf.readfile(root / 'result-electrical.dxf')
             self.assertFalse(document.audit().has_errors)
             labels = [item.dxf.text for item in document.modelspace().query('TEXT')]
-            self.assertTrue(any('ДОП. МОДУЛЬ M1' in label for label in labels))
+            self.assertTrue(any('M1 / ZENTEC M245 no display' in label for label in labels))
+            self.assertTrue(any('Клеммы M1' in label for label in labels))
+            self.assertTrue(any('Q1-1, Q1-2' in label for label in labels))
+            self.assertTrue(any('M6' in label for label in labels))
             frame_numbers = [item for item in document.modelspace().query('MTEXT') if item.plain_text().strip() in ('1', '2')]
             self.assertGreaterEqual(len(frame_numbers), 2)
             package = json.loads((root / 'result-manifest.json').read_text(encoding='utf-8'))
             self.assertEqual([item['ref'] for item in package['cadModuleSheets']], ['M1'])
-            unresolved = {item['fieldId']: item for item in package['cadParameterization']['fields']
-                          if item['status'] == 'unresolved'}
-            self.assertEqual(unresolved['plc.do.1']['assignedModule'], 'M1')
-            self.assertEqual(unresolved['plc.do.2']['assignedModule'], 'M1')
-            self.assertNotIn('plc.di', unresolved)
+            marked = {item['fieldId']: item for item in package['cadParameterization']['fields']}
+            self.assertEqual((marked['plc.do.1']['after'], marked['plc.do.2']['after']), ('Q1-1', 'Q1-2'))
+            self.assertEqual((marked['plc.do.1']['assignedModule'], marked['plc.do.2']['assignedModule']), ('M1', 'M1'))
+            self.assertFalse(any(item['status'] == 'unresolved' for item in marked.values()))
+            self.assertFalse(any('#' in item.plain_text() for item in document.modelspace().query('MTEXT')))
+
+    def test_module_common_is_labeled_on_motor_sheet(self):
+        selected = assembler.load_selected(assembler.DEFAULT_LIBRARY, assembler.DEFAULT_DXF_SOURCES, ['im1-012'])
+        profile = json.loads(assembler.PROFILES.read_text(encoding='utf-8'))['electrical']
+        pages = assembler.split_pages(assembler.load_and_validate(selected, profile), profile)
+        instance = dict(id='motor-1', tag='М1', channels=[
+            dict(family='DI24-PNP', address='01', terminals=['01'], deviceRef='M1', commonDesignation='GND1'),
+            dict(family='DOR-NO', address='Q1-1', terminals=['Q1-1', 'Q1-2'], deviceRef='PLC')],
+            cadHeadRules=template_heads('im1-012'))
+        with tempfile.TemporaryDirectory(prefix='l-module-common-') as directory:
+            output = Path(directory) / 'result.dxf'
+            trace = []
+            assembler.assemble(pages, output, [instance], profile=profile, parameter_trace=trace)
+            document = ezdxf.readfile(output)
+            self.assertFalse(document.audit().has_errors)
+            self.assertTrue(any(e.plain_text().strip() == 'GND1' for e in document.modelspace().query('MTEXT')))
+            self.assertTrue(any(field['status'] == 'applied' and field['assignedModule'] == 'M1'
+                                for field in trace))
+            self.assertTrue(any(e.dxf.text == 'M1' for e in document.modelspace().query('TEXT')))
+
+    def test_four_motor_templates_use_selected_pin_and_its_own_common(self):
+        heads = json.loads((ROOT / 'data/motor-v2.json').read_text(encoding='utf-8'))['diagramHeads']
+        scenarios = {
+            'im1-011': ('DI24-NPN', '13', 'GND2', 'DOR-NO', ['Q1-1', 'Q1-2'], None),
+            'im1-012': ('DI24-PNP', 'U1', 'GND3', 'DOR-NO', ['Q1-1', 'Q1-2'], None),
+            'im1-013': ('DI24-NPN', '13', 'GND2', 'DOT-PNP', ['U7'], 'GND3'),
+            'im1-014': ('DI24-PNP', 'U1', 'GND3', 'DOT-PNP', ['U7'], 'GND3'),
+        }
+        for code, (di_family, di_address, di_common, do_family, do_terminals, do_common) in scenarios.items():
+            with self.subTest(code=code), tempfile.TemporaryDirectory(prefix='l-plc-variant-') as directory:
+                selected = assembler.load_selected(assembler.DEFAULT_LIBRARY, assembler.DEFAULT_DXF_SOURCES, [code])
+                prepared = assembler.load_and_validate(selected)
+                self.assertLess(prepared[0][3].size.x, 100)
+                channels = [
+                    {'family': di_family, 'deviceRef': 'PLC', 'address': di_address,
+                     'terminals': [di_address], 'commonDesignation': di_common, 'commonKey': '#' + di_common},
+                    {'family': do_family, 'deviceRef': 'PLC', 'address': do_terminals[0],
+                     'terminals': do_terminals, 'commonDesignation': do_common,
+                     'commonKey': '#' + do_common if do_common else None},
+                ]
+                rules = [dict(row, value={'Imd-3': 'Насос', 'Imd-1': 'Н1', 'Imd-2': 'М1'}[row['keyDiagram']])
+                         for row in heads if row['code'] == code]
+                instance = {'id': 'm1', 'tag': 'M1', 'code': code, 'drawingKind': 'electrical',
+                            'channels': channels, 'cadHeadRules': rules}
+                trace = []
+                output = Path(directory) / 'result.dxf'
+                assembler.assemble(assembler.split_pages(prepared), output, instances=[instance],
+                                   parameter_trace=trace, drawing_kind='electrical')
+                self.assertFalse(ezdxf.readfile(output).audit().has_errors)
+                values = {item['fieldId']: item['after'] for item in trace}
+                self.assertEqual(values['plc.di'], di_address)
+                self.assertEqual(values['plc.common'], di_common)
+                self.assertEqual(values['plc.do.1'], do_terminals[0])
+                if do_common:
+                    self.assertEqual(values['plc.do.common'], do_common)
+                else:
+                    self.assertEqual(values['plc.do.2'], do_terminals[1])
+                self.assertEqual(values['header.marking'], 'Н1')
+                self.assertTrue(all(item['status'] in ('applied', 'shared-common') for item in trace))
+                self.assertEqual(sum(item['status'] == 'shared-common' for item in trace),
+                                 int(do_common is not None and di_common == do_common))
+
+    def test_shared_gnd_removes_entire_duplicate_branch_and_packs_fragments(self):
+        code = 'im1-014'
+        heads = json.loads((ROOT / 'data/motor-v2.json').read_text(encoding='utf-8'))['diagramHeads']
+        channels = [
+            {'family': 'DI24-PNP', 'deviceRef': 'PLC', 'address': 'U1', 'terminals': ['U1'],
+             'commonDesignation': 'GND3', 'commonKey': '#GND3'},
+            {'family': 'DOT-PNP', 'deviceRef': 'PLC', 'address': 'U7', 'terminals': ['U7'],
+             'commonDesignation': 'GND3', 'commonKey': '#GND3'},
+        ]
+        instances = [{'id': f'm{number}', 'tag': f'M{number}', 'code': code, 'drawingKind': 'electrical',
+                      'channels': channels, 'cadHeadRules': [
+                          dict(row, value={'Imd-3': 'Насос', 'Imd-1': f'Н{number}', 'Imd-2': f'М{number}'}[row['keyDiagram']])
+                          for row in heads if row['code'] == code]}
+                     for number in (1, 2)]
+        selected = assembler.load_selected(assembler.DEFAULT_LIBRARY, assembler.DEFAULT_DXF_SOURCES, [code, code])
+        with tempfile.TemporaryDirectory(prefix='l-common-merge-') as directory:
+            trace = []
+            output = Path(directory) / 'result.dxf'
+            assembler.assemble(assembler.split_pages(assembler.load_and_validate(selected)), output,
+                               instances=instances, profile=json.loads(assembler.PROFILES.read_text())['electrical'],
+                               parameter_trace=trace, drawing_kind='electrical')
+            document = ezdxf.readfile(output)
+            self.assertFalse(document.audit().has_errors)
+            labels = [assembler.mtext_plain(entity) for entity in document.modelspace().query('MTEXT')
+                      if assembler.source_layer_name(entity.dxf.layer) == 'XT1']
+            self.assertEqual(labels.count('GND3'), 1)
+            self.assertNotIn('GND1', labels)
+            merged = [item for item in trace if item['status'] == 'shared-common']
+            self.assertEqual(len(merged), 3)
+            self.assertTrue(all(len(item['removedEntityHandles']) == 5 for item in merged))
+            first_fields = {item['fieldId']: item['status'] for item in trace if item['instanceId'] == 'm1'}
+            self.assertEqual(first_fields['plc.common'], 'shared-common')
+            self.assertEqual(first_fields['plc.do.common'], 'applied')
 
     def test_separate_document_sets_and_multipage_frames(self):
         instances = api.validate_instances({'instances': [
             dict(id=f'm{index}-{code}', tag=f'M{index}', code=code,
-                 **({'channels': im1_014_channels(), 'cadHeadRules': []} if code == 'im1-014' else {}))
+                 **({'channels': im1_014_channels(), 'cadHeadRules': template_heads(code, f'M{index}')} if code == 'im1-014' else {}))
             for index in range(8) for code in ['im1-014', 'im2-1']]})
         with tempfile.TemporaryDirectory(prefix='l-sets-test-') as directory:
             root = Path(directory)
@@ -313,8 +726,11 @@ class CadTests(unittest.TestCase):
             for kind, forbidden in [('electrical', 'im2-1'), ('external', 'im1-014')]:
                 document = ezdxf.readfile(root / f'result-{kind}.dxf')
                 self.assertFalse(document.audit().has_errors)
+                if kind == 'electrical':
+                    self.assertFalse(any('#' in entity.plain_text()
+                                         for entity in document.modelspace().query('MTEXT')))
                 labels = [entity.dxf.text for entity in document.modelspace().query('TEXT') if entity.dxf.text.startswith('DRAFT')]
-                self.assertEqual(len(labels), 8)
+                self.assertEqual(len(labels), 24 if kind == 'electrical' else 8)
                 self.assertFalse(any(forbidden in label for label in labels))
                 frame_count = len([entity for entity in document.modelspace().query('INSERT') if '2-я страница' in entity.dxf.name])
                 self.assertGreater(frame_count, 1)
@@ -334,7 +750,7 @@ class CadTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix='l-cad-test-') as directory:
             output = Path(directory) / 'result.dxf'
             instances = [dict(id=f'part-{index}', tag=f'M{index}',
-                              **({'channels': im1_014_channels(), 'cadHeadRules': []} if code == 'im1-014' else {}))
+                              **({'channels': im1_014_channels(), 'cadHeadRules': template_heads(code, f'M{index}')} if code == 'im1-014' else {}))
                          for index, code in enumerate(codes)]
             assembler.assemble(assembler.split_pages(assembler.load_and_validate(selected)), output, instances=instances)
             document = ezdxf.readfile(output)

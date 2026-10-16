@@ -39,9 +39,13 @@ import {
 } from '@/lib/client-id';
 import {
   addWorkspace,
+  deleteLocalProject,
+  deleteLocalWorkspace,
   loadLocalCatalog,
   loadLocalWorkspace,
   newProject,
+  removeProject,
+  removeWorkspace,
   saveLocalCatalog,
   saveLocalWorkspace,
   type LocalProject,
@@ -95,6 +99,17 @@ function blockCountLabel(count: number) {
   return `${String(count).padStart(2, '0')} ${ending}`;
 }
 
+function nextFreeCell(
+  motors: Array<Pick<MotorBlock, 'cell'>>,
+  preferredCell: number,
+) {
+  for (let offset = 0; offset < CELLS; offset++) {
+    const cell = (preferredCell + offset) % CELLS;
+    if (!motors.some((motor) => motor.cell === cell)) return cell;
+  }
+  return null;
+}
+
 function LoadingScreen() {
   return <main className="l-rainbow grid min-h-screen place-items-center p-6 text-sm text-[#747480]">Проверяем доступ…</main>;
 }
@@ -110,13 +125,11 @@ function LoginScreen({ onLogin }: { onLogin: (user: string) => void }) {
     setError('');
     try {
       const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
       });
       const result = await response.json() as { user?: string; error?: string };
-      if (!response.ok || !result.user)
-        throw new Error(result.error || 'Не удалось войти.');
+      if (!response.ok || !result.user) throw new Error(result.error || 'Не удалось войти.');
       onLogin(result.user);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Не удалось войти.');
@@ -141,18 +154,11 @@ function LoginScreen({ onLogin }: { onLogin: (user: string) => void }) {
   </main>;
 }
 
-function nextFreeCell(
-  motors: Array<Pick<MotorBlock, 'cell'>>,
-  preferredCell: number,
-) {
-  for (let offset = 0; offset < CELLS; offset++) {
-    const cell = (preferredCell + offset) % CELLS;
-    if (!motors.some((motor) => motor.cell === cell)) return cell;
-  }
-  return null;
-}
-
 type Session = { enabled: boolean; user: string | null };
+type ProjectScreen =
+  | { kind: 'projects' }
+  | { kind: 'workspaces'; projectId: string }
+  | { kind: 'cabinet'; projectId: string; workspaceId: string };
 
 export default function Home() {
   const [session, setSession] = useState<Session | null>(null);
@@ -165,15 +171,9 @@ export default function Home() {
     return () => { active = false; };
   }, []);
   if (!session) return <LoadingScreen />;
-  if (session.enabled && !session.user)
-    return <LoginScreen onLogin={(user) => setSession({ enabled: true, user })} />;
+  if (session.enabled && !session.user) return <LoginScreen onLogin={(user) => setSession({ enabled: true, user })} />;
   return <ProjectHome user={session.user} onLogout={() => setSession({ enabled: true, user: null })} />;
 }
-
-type ProjectScreen =
-  | { kind: 'projects' }
-  | { kind: 'workspaces'; projectId: string }
-  | { kind: 'cabinet'; projectId: string; workspaceId: string };
 
 function ProjectHome({ user, onLogout }: { user: string | null; onLogout: () => void }) {
   const [catalog, setCatalog] = useState(() => loadLocalCatalog(user));
@@ -182,80 +182,71 @@ function ProjectHome({ user, onLogout }: { user: string | null; onLogout: () => 
   const [workspaceName, setWorkspaceName] = useState('');
   const createProject = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const project = newProject(projectName);
-    const next = { projects: [...catalog.projects, project] };
+    const created = newProject(projectName);
+    const next = { projects: [...catalog.projects, created] };
     saveLocalCatalog(user, next);
-    setCatalog(next);
-    setProjectName('');
-    setScreen({ kind: 'workspaces', projectId: project.id });
+    setCatalog(next); setProjectName(''); setScreen({ kind: 'workspaces', projectId: created.id });
   };
   const project = screen.kind === 'projects' ? null : catalog.projects.find((item) => item.id === screen.projectId) || null;
   const createWorkspace = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!project) return;
     const next = addWorkspace(catalog, project.id, workspaceName);
+    saveLocalCatalog(user, next); setCatalog(next); setWorkspaceName('');
+  };
+  const deleteProject = (target: LocalProject) => {
+    if (!window.confirm(`Удалить проект «${target.name}» и все его рабочие области? Это удалит сохранённые в этом браузере блоки и ответы.`)) return;
+    deleteLocalProject(user, target);
+    const next = removeProject(catalog, target.id);
     saveLocalCatalog(user, next);
     setCatalog(next);
-    setWorkspaceName('');
+    setScreen({ kind: 'projects' });
   };
-  const logout = async () => {
-    await fetch('/api/auth/logout', { method: 'POST' });
-    onLogout();
+  const deleteWorkspace = (target: LocalWorkspace) => {
+    if (!project || !window.confirm(`Удалить рабочую область «${target.name}»? Её блоки и ответы будут удалены только из этого браузера.`)) return;
+    deleteLocalWorkspace(user, project.id, target.id);
+    const next = removeWorkspace(catalog, project.id, target.id);
+    saveLocalCatalog(user, next);
+    setCatalog(next);
   };
+  const logout = async () => { await fetch('/api/auth/logout', { method: 'POST' }); onLogout(); };
   if (screen.kind === 'cabinet') {
     const workspace = project?.workspaces.find((item) => item.id === screen.workspaceId);
     if (project && workspace) return <CabinetApp user={user} project={project} workspace={workspace} onBack={() => setScreen({ kind: 'workspaces', projectId: project.id })} onLogout={logout} />;
   }
-  return (
-    <main className="l-rainbow min-h-screen text-[#171720]">
-      <header className="mx-auto flex max-w-5xl items-center justify-between px-5 py-5 sm:px-8">
-        <div className="flex items-center gap-3">
-          <span className="l-block-gradient grid size-10 place-items-center rounded-2xl text-sm font-black text-white shadow-lg">L</span>
-          <div><h1 className="text-sm font-bold tracking-[-.02em]">L Constructor</h1><p className="text-xs text-[#747480]">личный кабинет</p></div>
-        </div>
-        {user && <button type="button" className="rounded-full border border-white bg-white/70 p-2 text-[#63636f] shadow-sm transition hover:text-[#312e72]" title="Выйти" onClick={logout}><LogOut className="size-3.5" /></button>}
-      </header>
-      <section className="mx-auto max-w-5xl px-5 pb-12 sm:px-8">
-        {screen.kind === 'projects' ? <>
-          <p className="text-xs font-semibold uppercase tracking-[.16em] text-[#777786]">Проекты</p>
-          <h2 className="mt-1 text-3xl font-semibold tracking-[-.05em]">Инженерные проекты</h2>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-[#767682]">В проекте находятся отдельные рабочие области: каждая хранит своё поле шкафа, ответы блоков и результаты расчёта.</p>
-          <form onSubmit={createProject} className="mt-7 flex max-w-xl gap-2 rounded-[24px] border border-white bg-white/75 p-3 shadow-[0_14px_50px_rgba(28,29,44,.07)] backdrop-blur">
-            <Input aria-label="Название проекта" value={projectName} maxLength={80} onChange={(event) => setProjectName(event.target.value)} placeholder="Например, ПС Северная" />
-            <Button type="submit"><Plus className="size-4" />Создать</Button>
-          </form>
-          {!catalog.projects.length ? <div className="mt-7 rounded-[28px] border border-dashed border-[#d9d9e3] bg-white/55 p-8 text-sm leading-6 text-[#777786]">Пока нет проектов. Создай первый — в нём сразу появится «Рабочая область 1».</div> :
-            <div className="mt-7 grid gap-4 sm:grid-cols-2">{catalog.projects.map((item) => <button key={item.id} onClick={() => setScreen({ kind: 'workspaces', projectId: item.id })} className="l-glow rounded-[28px] bg-white p-6 text-left transition hover:-translate-y-0.5"><FolderKanban className="size-6 text-[#7669dc]" /><h3 className="mt-5 text-lg font-semibold">{item.name}</h3><p className="mt-1 text-sm text-[#747480]">{item.workspaces.length} раб. {item.workspaces.length === 1 ? 'область' : 'области'} · открыть</p></button>)}</div>}
-        </> : project ? <>
-          <button type="button" onClick={() => setScreen({ kind: 'projects' })} className="mb-5 flex items-center gap-2 text-sm font-medium text-[#6254ca]"><ArrowLeft className="size-4" />Все проекты</button>
-          <p className="text-xs font-semibold uppercase tracking-[.16em] text-[#777786]">Проект</p>
-          <h2 className="mt-1 text-3xl font-semibold tracking-[-.05em]">{project.name}</h2>
-          <p className="mt-3 text-sm leading-6 text-[#767682]">Рабочие области разделяют шкафы и их черновики. Внутри одной области собирается один состав шкафа.</p>
-          <form onSubmit={createWorkspace} className="mt-7 flex max-w-xl gap-2 rounded-[24px] border border-white bg-white/75 p-3 shadow-[0_14px_50px_rgba(28,29,44,.07)] backdrop-blur">
-            <Input aria-label="Название рабочей области" value={workspaceName} maxLength={80} onChange={(event) => setWorkspaceName(event.target.value)} placeholder={`Рабочая область ${project.workspaces.length + 1}`} />
-            <Button type="submit"><Plus className="size-4" />Добавить</Button>
-          </form>
-          <div className="mt-7 grid gap-4 sm:grid-cols-2">{project.workspaces.map((item) => <button key={item.id} onClick={() => setScreen({ kind: 'cabinet', projectId: project.id, workspaceId: item.id })} className="l-glow rounded-[28px] bg-white p-6 text-left transition hover:-translate-y-0.5"><Layers3 className="size-6 text-[#7669dc]" /><h3 className="mt-5 text-lg font-semibold">{item.name}</h3><p className="mt-1 text-sm text-[#747480]">Поле шкафа · открыть</p></button>)}</div>
-        </> : null}
-      </section>
-    </main>
-  );
+  return <main className="l-rainbow min-h-screen text-[#171720]">
+    <header className="mx-auto flex max-w-5xl items-center justify-between px-5 py-5 sm:px-8">
+      <div className="flex items-center gap-3"><span className="l-block-gradient grid size-10 place-items-center rounded-2xl text-sm font-black text-white shadow-lg">L</span><div><h1 className="text-sm font-bold tracking-[-.02em]">L Constructor</h1><p className="text-xs text-[#747480]">личный кабинет</p></div></div>
+      {user && <button type="button" className="rounded-full border border-white bg-white/70 p-2 text-[#63636f] shadow-sm transition hover:text-[#312e72]" title="Выйти" onClick={logout}><LogOut className="size-3.5" /></button>}
+    </header>
+    <section className="mx-auto max-w-5xl px-5 pb-12 sm:px-8">
+      {screen.kind === 'projects' ? <>
+        <p className="text-xs font-semibold uppercase tracking-[.16em] text-[#777786]">Проекты</p><h2 className="mt-1 text-3xl font-semibold tracking-[-.05em]">Инженерные проекты</h2>
+        <p className="mt-3 max-w-2xl text-sm leading-6 text-[#767682]">В проекте находятся отдельные рабочие области: каждая хранит своё поле шкафа, ответы блоков и результаты расчёта.</p>
+        <form onSubmit={createProject} className="mt-7 flex max-w-xl gap-2 rounded-[24px] border border-white bg-white/75 p-3 shadow-[0_14px_50px_rgba(28,29,44,.07)] backdrop-blur"><Input aria-label="Название проекта" value={projectName} maxLength={80} onChange={(event) => setProjectName(event.target.value)} placeholder="Например, ПС Северная" /><Button type="submit"><Plus className="size-4" />Создать</Button></form>
+        {!catalog.projects.length ? <div className="mt-7 rounded-[28px] border border-dashed border-[#d9d9e3] bg-white/55 p-8 text-sm leading-6 text-[#777786]">Пока нет проектов. Создай первый — в нём сразу появится «Рабочая область 1».</div> : <div className="mt-7 grid gap-4 sm:grid-cols-2">{catalog.projects.map((item) => <article key={item.id} className="l-glow relative rounded-[28px] bg-white p-6 transition hover:-translate-y-0.5"><button type="button" onClick={() => setScreen({ kind: 'workspaces', projectId: item.id })} className="block w-full text-left"><FolderKanban className="size-6 text-[#7669dc]" /><h3 className="mt-5 text-lg font-semibold">{item.name}</h3><p className="mt-1 text-sm text-[#747480]">{item.workspaces.length} раб. {item.workspaces.length === 1 ? 'область' : 'области'} · открыть</p></button><button type="button" aria-label={`Удалить проект ${item.name}`} title="Удалить проект" onClick={() => deleteProject(item)} className="absolute right-4 top-4 rounded-full p-2 text-[#8d8d9a] transition hover:bg-[#fff0f3] hover:text-[#c83c58]"><Trash2 className="size-4" /></button></article>)}</div>}
+      </> : project ? <>
+        <button type="button" onClick={() => setScreen({ kind: 'projects' })} className="mb-5 flex items-center gap-2 text-sm font-medium text-[#6254ca]"><ArrowLeft className="size-4" />Все проекты</button>
+        <p className="text-xs font-semibold uppercase tracking-[.16em] text-[#777786]">Проект</p><h2 className="mt-1 text-3xl font-semibold tracking-[-.05em]">{project.name}</h2>
+        <p className="mt-3 text-sm leading-6 text-[#767682]">Рабочие области разделяют шкафы и их черновики. Внутри одной области собирается один состав шкафа.</p>
+        <form onSubmit={createWorkspace} className="mt-7 flex max-w-xl gap-2 rounded-[24px] border border-white bg-white/75 p-3 shadow-[0_14px_50px_rgba(28,29,44,.07)] backdrop-blur"><Input aria-label="Название рабочей области" value={workspaceName} maxLength={80} onChange={(event) => setWorkspaceName(event.target.value)} placeholder={`Рабочая область ${project.workspaces.length + 1}`} /><Button type="submit"><Plus className="size-4" />Добавить</Button></form>
+        {!project.workspaces.length ? <div className="mt-7 rounded-[28px] border border-dashed border-[#d9d9e3] bg-white/55 p-8 text-sm leading-6 text-[#777786]">В проекте пока нет рабочих областей. Добавь новую выше.</div> : <div className="mt-7 grid gap-4 sm:grid-cols-2">{project.workspaces.map((item) => <article key={item.id} className="l-glow relative rounded-[28px] bg-white p-6 transition hover:-translate-y-0.5"><button type="button" onClick={() => setScreen({ kind: 'cabinet', projectId: project.id, workspaceId: item.id })} className="block w-full text-left"><Layers3 className="size-6 text-[#7669dc]" /><h3 className="mt-5 text-lg font-semibold">{item.name}</h3><p className="mt-1 text-sm text-[#747480]">Поле шкафа · открыть</p></button><button type="button" aria-label={`Удалить рабочую область ${item.name}`} title="Удалить рабочую область" onClick={() => deleteWorkspace(item)} className="absolute right-4 top-4 rounded-full p-2 text-[#8d8d9a] transition hover:bg-[#fff0f3] hover:text-[#c83c58]"><Trash2 className="size-4" /></button></article>)}</div>}
+      </> : null}
+    </section>
+  </main>;
 }
 
 function CabinetApp({ user, project, workspace, onBack, onLogout }: { user: string | null; project: LocalProject; workspace: LocalWorkspace; onBack: () => void; onLogout: () => void }) {
   const [savedProject] = useState(() => loadLocalWorkspace(user, project.id, workspace.id));
-  const [motors, setMotors] = useState<MotorBlock[]>(() => savedProject.motors.map((motor: StoredMotor) => ({
-    ...motor,
-    requested: false,
-    generation: { status: 'idle' },
-  })));
+  const [motors, setMotors] = useState<MotorBlock[]>(() => savedProject.motors.map((motor: StoredMotor) => ({ ...motor, requested: false, generation: { status: 'idle' } })));
   const [activeMotorId, setActiveMotorId] = useState<string | null>(savedProject.activeMotorId);
+  const [moduleCount, setModuleCount] = useState(savedProject.moduleCount);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(savedProject.sheetOpen);
   const [cabinetExport, setCabinetGeneration] = useState<Generation>({
     status: 'idle',
   });
-  const engineering = useEngineering(motors, (normalized) => {
+  const engineering = useEngineering(motors, moduleCount, (normalized) => {
     setMotors(current => applyNormalizedAnswers(current, normalized));
   });
   const {cabinet, revision: questionnaireRevision} = engineering;
@@ -264,10 +255,11 @@ function CabinetApp({ user, project, workspace, onBack, onLogout }: { user: stri
   useEffect(() => {
     saveLocalWorkspace(user, project.id, workspace.id, {
       motors: motors.map(({ id, tag, cell, state, mainSchemeCode }) => ({ id, tag, cell, state, ...(mainSchemeCode ? { mainSchemeCode } : {}) })),
+      moduleCount,
       activeMotorId,
       sheetOpen,
     });
-  }, [user, project.id, workspace.id, motors, activeMotorId, sheetOpen]);
+  }, [user, project.id, workspace.id, motors, moduleCount, activeMotorId, sheetOpen]);
   const latestVersion = useRef(inputVersion);
   useLayoutEffect(() => { latestVersion.current = inputVersion; }, [inputVersion]);
   const activeMotor =
@@ -383,7 +375,7 @@ function CabinetApp({ user, project, workspace, onBack, onLogout }: { user: stri
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          motors: JSON.parse(version),
+          ...JSON.parse(version),
           ...(blockId ? { blockId } : {}),
           ruleFingerprint: cabinet.ruleFingerprint,
         }),
@@ -469,9 +461,7 @@ function CabinetApp({ user, project, workspace, onBack, onLogout }: { user: stri
             <h1 className="text-sm font-bold tracking-[-.02em]">
               L Constructor
             </h1>
-            <p className="text-xs text-[#747480]">
-              {project.name} · {workspace.name}
-            </p>
+            <p className="text-xs text-[#747480]">{project.name} · {workspace.name}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -571,12 +561,25 @@ function CabinetApp({ user, project, workspace, onBack, onLogout }: { user: stri
               </div>
             )}
             <div className="mt-5 rounded-2xl bg-[#f4f4f8] p-4 text-xs leading-5 text-[#777786]">
-              I/O распределяются по ZENTEC M245 и, при нехватке выводов, до пяти
-              тестовых модулей M245 no display для всего шкафа. Клеммы XT и связи
-              GND/COM в DXF пока не назначаются.
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="font-semibold text-[#403b55]">Модули расширения</p>
+                  <p>ZENTEC M245 no display · добавлены вручную</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button type="button" aria-label="Убрать модуль расширения" disabled={moduleCount === 0}
+                    onClick={() => setModuleCount(value => Math.max(0, value - 1))}
+                    className="rounded-lg bg-white px-3 py-1 text-base font-semibold text-[#6254ca] disabled:opacity-40">−</button>
+                  <span aria-live="polite" className="min-w-5 text-center text-sm font-semibold text-[#403b55]">{moduleCount}</span>
+                  <button type="button" aria-label="Добавить модуль расширения" disabled={moduleCount === 5}
+                    onClick={() => setModuleCount(value => Math.min(5, value + 1))}
+                    className="rounded-lg bg-white px-3 py-1 text-base font-semibold text-[#6254ca] disabled:opacity-40">+</button>
+                </div>
+              </div>
+              <p className="mt-2">Выводы распределяются только по контроллеру и добавленным модулям. Максимум 5 модулей.</p>
               {cabinet.plcHardware.length > 0 && (
                 <p className="mt-2 font-semibold text-[#403b55]">
-                  Подобрано: {cabinet.plcHardware.map((device) => `${device.ref} — ${device.brand} ${device.model}`).join('; ')}.
+                  Состав: {cabinet.plcHardware.map((device) => `${device.ref} — ${device.brand} ${device.model}`).join('; ')}.
                 </p>
               )}
             </div>
@@ -616,14 +619,9 @@ function CabinetApp({ user, project, workspace, onBack, onLogout }: { user: stri
                 </p>
               )}
               {cabinet.errors.length > 0 && (
-                <p className="text-xs leading-5 text-[#9a5635]">
-                  Нужно заполнить или исправить блоки:{' '}
-                  {cabinet.blocks
-                    .filter((block) => block.errors.length)
-                    .map((block) => block.tag)
-                    .join(', ') || cabinet.errors[0]}
-                  . Открой опросник.
-                </p>
+                <ul role="alert" className="space-y-1 text-xs leading-5 text-[#9a5635]">
+                  {cabinet.errors.map((message, index) => <li key={`${index}:${message}`}>{message}</li>)}
+                </ul>
               )}
               <Button
                 variant="outline"
@@ -1276,7 +1274,7 @@ function DiagramResult({
         <>
           <p className="text-sm text-[#747480]">
             Выбран вариант схемы и назначены выводы контроллера и, если нужны, модулей.
-            Обозначение перед номером вывода показывает устройство.
+            Устройство, номер клеммы и общий вывод показаны отдельно.
           </p>
           <DiagramTable
             rows={[{ row: selectedMain, sourceOrder: 'I/O optimizer' }]}
@@ -1288,7 +1286,7 @@ function DiagramResult({
               </p>
               <p className="mt-2 font-mono leading-5">
                 {channels
-                  .map((channel) => [`${channel.deviceRef}:${channel.terminals.join(' / ')}`, channel.family, channel.commonRef].filter(Boolean).join(' · '))
+                  .map((channel) => [channel.deviceRef, channel.family, `клемма ${channel.terminals.join(' / ')}`, channel.commonDesignation && `общий ${channel.commonDesignation}`].filter(Boolean).join(' · '))
                   .join('\n')}
               </p>
             </div>
@@ -1382,36 +1380,55 @@ function TraceSection({
   caption,
   entries,
   empty,
+  defaultOpen = false,
 }: {
   title: string;
   caption: string;
   entries: TraceEntry[];
   empty: string;
+  defaultOpen?: boolean;
 }) {
   return (
-    <section className="py-2.5 first:pt-0">
-      <h4 className="text-sm font-semibold text-[#403b55]">{title}</h4>
-      <p className="mt-0.5 text-[11px] leading-4 text-[#85818f]">{caption}</p>
-      {entries.length ? (
-        <dl className="mt-1.5 space-y-1.5 text-xs">
-          {entries.map((entry) => (
-            <div key={entry.id}>
-              <dt className="inline font-semibold leading-5 text-[#44424f]">
-                {entry.title}
-                {entry.source && (
-                  <span className="ml-1.5 font-mono text-[10px] font-normal text-[#77718f]">
-                    {sourceLabel(entry.source)}
-                  </span>
-                )}
-              </dt>
-              <dd className="inline leading-5 text-[#6d6a76]"> — {entry.detail}</dd>
-            </div>
-          ))}
-        </dl>
-      ) : (
-        <p className="mt-2 text-xs leading-5 text-[#85818f]">{empty}</p>
-      )}
-    </section>
+    <details open={defaultOpen} className="overflow-hidden rounded-2xl border border-[#e1dff0] bg-white">
+      <summary aria-label={title} className="cursor-pointer list-none px-4 py-3 marker:hidden">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-[#403b55]">{title}</p>
+            <p className="mt-0.5 text-[11px] leading-4 text-[#85818f]">
+              {caption}
+            </p>
+          </div>
+          <span className="rounded-full bg-[#f0eeff] px-2 py-1 text-[10px] font-bold text-[#6d60d3]">
+            {entries.length}
+          </span>
+        </div>
+      </summary>
+      <div className="border-t border-[#eeeeF4] px-4 py-3">
+        {entries.length ? (
+          <ul className="space-y-2.5">
+            {entries.map((entry) => (
+              <li key={entry.id} className="rounded-xl bg-[#f8f8fc] px-3 py-2.5">
+                <div className="flex items-start justify-between gap-3">
+                  <p className="text-xs font-semibold leading-5 text-[#44424f]">
+                    {entry.title}
+                  </p>
+                  {entry.source && (
+                    <span className="shrink-0 rounded-md bg-[#eceafb] px-1.5 py-0.5 font-mono text-[10px] text-[#6d60d3]">
+                      {sourceLabel(entry.source)}
+                    </span>
+                  )}
+                </div>
+                <p className="mt-1 text-xs leading-5 text-[#6d6a76]">
+                  {entry.detail}
+                </p>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-xs leading-5 text-[#85818f]">{empty}</p>
+        )}
+      </div>
+    </details>
   );
 }
 
@@ -1437,10 +1454,19 @@ function DecisionTrace({
     })),
   ];
   return (
-    <section>
-      <p className="mb-4 text-xs leading-5 text-[#777481]">
-        Активные ответы, применённые правила и полученный состав блока.
-      </p>
+    <section className="space-y-3">
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-[.16em] text-[#7669dc]">
+          Входы и результаты
+        </p>
+        <h3 className="mt-1 text-lg font-semibold tracking-[-.03em] text-[#34323f]">
+          От ответов к результату
+        </h3>
+        <p className="mt-1 text-xs leading-5 text-[#777481]">
+          Активные ответы ведут к правилам из ОЛ, затем — к схемам, I/O и
+          спецификации. Строки показывают источник каждого решения.
+        </p>
+      </div>
       <TraceSection
         title="Входные данные"
         caption="Только видимые ответы этого экземпляра"
@@ -1452,6 +1478,7 @@ function DecisionTrace({
         caption="Выбор схем и инженерных диапазонов"
         entries={trace.rules}
         empty="Правила появятся после выбора совместимой схемы."
+        defaultOpen
       />
       <TraceSection
         title="Выходные данные"
